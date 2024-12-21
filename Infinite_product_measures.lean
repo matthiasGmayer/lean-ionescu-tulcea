@@ -15,6 +15,11 @@ noncomputable section
 /- Now write definitions and theorems. -/
 namespace MeasureTheory
 
+theorem SetAlgebraIsSetSemiRing (h1 : IsSetAlgebra S) : IsSetSemiring S := by {
+  refine IsSetRing.isSetSemiring ?_
+  exact IsSetAlgebra.isSetRing h1
+}
+
 -- def LE.lesser [les : LE α] (x : les.le a b) := a
 def lesser {α : Type} [LE α] {x y : α} (h : x ≤ y) : α :=
   x
@@ -30,6 +35,9 @@ variable {α : Type*} {S : Set (Set α)} [MeasurableSpace α] (μ : AddContent S
 lemma AddContent.additive (A B : Set α) (hAB : Disjoint A B) : μ (A ∪ B) = μ A + μ B := by {
   sorry
 }
+-- lemma AddContent.mono (A B : Set α) (hAB : Disjoint A B) : μ (A ∪ B) = μ A + μ B := by {
+--   sorry
+-- }
   -- := by {
 
   -- }
@@ -74,6 +82,85 @@ lemma sContinuousInEmpty_finite_implies_sAdditive : μ.sContinuousInEmpty ∧ μ
   -- (Tendsto A atTop (𝓝[≥] B)) ->
   --   Tendsto (λ n => μ (A n)) atTop (𝓝 0)
 
+
+def AddContent.toOuterMeasure :=
+    inducedOuterMeasure (λ s : Set α => λ _ : s ∈ S => μ s)
+
+variable (hAlg : IsSetAlgebra S)
+
+lemma addContent_outer_measure_equal_on_S (s : Set α) (hs : s ∈ S) (hμ : μ.sAdditive)
+  : μ.toOuterMeasure hAlg.empty_mem μ.empty' s = μ s := by {
+      -- generalize h : μ.toOuterMeasure hAlg.empty_mem μ.empty' = ν
+      let ν := μ.toOuterMeasure hAlg.empty_mem μ.empty'
+      suffices ν s <= μ s ∧ ν s >= μ s by exact le_antisymm this.1 this.2
+      constructor
+      ·
+        unfold ν AddContent.toOuterMeasure inducedOuterMeasure OuterMeasure.ofFunction
+        rw [← @OuterMeasure.measureOf_eq_coe]
+        simp
+        let f : ℕ -> Set α := fun n => if n = 0 then s else ∅
+        have hf : ⋃ i, f i = s := by ext; simp [f]
+        calc
+        ⨅ f : ℕ -> Set α, ⨅ (_ : s ⊆ ⋃ i, f i), ∑' (i : ℕ), extend (fun s x ↦ μ s) (f i)
+        <= ⨅ (_ : s ⊆ ⋃ i, f i), ∑' (i : ℕ),
+          extend (P := Membership.mem S) (fun s x ↦ μ s) (f i) := by apply iInf_le
+        _ =  ∑' (i : ℕ), extend (P := Membership.mem S) (fun s x ↦ μ s) (f i) := by simp [hf]
+        _ =  μ s := by {
+          unfold f
+          simp [apply_ite, extend_eq (fun s x => μ s)]
+          rw [show extend (P := Membership.mem S) (fun s x => μ s) s = μ s by {
+            exact extend_eq (fun s x ↦ μ s) hs
+          }]
+          rw [show extend (P := Membership.mem S) (fun s x => μ s) ∅ = 0 by {
+            have h := extend_eq (fun s x ↦ μ s) hAlg.empty_mem
+            simp at h
+            exact h
+          }]
+          simp
+        }
+      ·
+        rw [ge_iff_le]
+        unfold ν AddContent.toOuterMeasure inducedOuterMeasure OuterMeasure.ofFunction
+        rw [← OuterMeasure.measureOf_eq_coe]
+        simp
+        intro A hA
+        by_cases hAS : ∀n, A n ∈ S
+        ·
+          calc μ s = μ ((⋃n, A n) ∩ s) := by rw [inter_eq_self_of_subset_right hA]
+          _ = μ (⋃ n, A n ∩ s) := by rw [@iUnion_inter]
+          _ <= ∑' n, μ (A n ∩ s) := by {
+            apply sAdditive_implies_sSubAdditive μ hμ
+            intro n; exact IsSetAlgebra.inter_mem hAlg (hAS n) hs
+            suffices ⋃ n, A n ∩ s = s by exact mem_of_eq_of_mem this hs
+            simp [<- iUnion_inter, inter_eq_self_of_subset_right, hA]
+          }
+          _ <= ∑' n, μ (A n) := by {
+            gcongr
+            rename_i n
+            specialize hAS n
+            have h : A n ∩ s ∈ S := by exact IsSetAlgebra.inter_mem hAlg hAS hs
+            have h' : A n ∩ s ⊆ A n := by exact inter_subset_left
+            have hA : IsSetSemiring S := by exact SetAlgebraIsSetSemiRing hAlg
+            apply addContent_mono hA h hAS h'
+          }
+          _ = ∑' n, extend (fun s x ↦ μ s) (A n) := by {
+            congr; ext n
+            exact Eq.symm (extend_eq (fun s x ↦ μ s) (hAS n))
+          }
+        ·
+          suffices ∞ <= ∑' n, extend (P := Membership.mem S) (fun s x ↦ μ s) (A n) by {
+            rw [@top_le_iff] at this
+            rw [this]
+            simp
+          }
+          push_neg at hAS
+          obtain ⟨n, hn⟩ := hAS
+          calc ∞ = extend (P := Membership.mem S) (fun s x => μ s) (A n) := by {
+            unfold extend
+            simp [hn]
+          }
+          _ <= ∑' n, extend (fun s x ↦ μ s) (A n) := by exact ENNReal.le_tsum n
+  }
 
 
 
@@ -223,11 +310,6 @@ theorem uniqeness_of_prob_measures [mα : MeasurableSpace α] (μ ν : Probabili
     }
   }
 
-
-theorem SetAlgebraIsSetSemiRing (h1 : IsSetAlgebra S) : IsSetSemiring S := by {
-  refine IsSetRing.isSetSemiring ?_
-  exact IsSetAlgebra.isSetRing h1
-}
 
 #check extend_iUnion_le_tsum_nat'
 
@@ -456,7 +538,19 @@ theorem existence_of_measures [mα : MeasurableSpace α] (hSG : mα = generateFr
     --   induction s hs using induction_on_inter with
     --   | h_eq =>
     -- apply ExistsUnique.intro ν
-    sorry
+    have hν : mα <= ν.caratheodory := by {
+      sorry
+    }
+    let ν' := ν.toMeasure hν
+    have hν' : ∀s ∈ S, μ s = ν' s := by {
+      intro s hs
+      unfold ν'
+      -- simp [ν', OuterMeasure.toMeasure, ν, inducedOuterMeasure, Measure.ofMeasurable,
+      -- OuterMeasure.ofFunction]
+      -- rw [← measureOf_eq_coe]
+      -- simp [OuterMeasure.ofFunction]
+
+    }
   }
 
 
