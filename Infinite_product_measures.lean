@@ -29,7 +29,7 @@ def greater {α : Type} [LE α] {x y : α} (h : x ≤ y) : α :=
 
 open Filter Topology
 
-variable {α : Type*} {S : Set (Set α)} [MeasurableSpace α] (μ : AddContent S)
+variable {α : Type*} {S : Set (Set α)} [mα : MeasurableSpace α] (μ : AddContent S)
 
 
 lemma AddContent.additive (A B : Set α) (hAB : Disjoint A B) : μ (A ∪ B) = μ A + μ B := by {
@@ -162,6 +162,81 @@ lemma addContent_outer_measure_equal_on_S (s : Set α) (hs : s ∈ S) (hμ : μ.
           _ <= ∑' n, extend (fun s x ↦ μ s) (A n) := by exact ENNReal.le_tsum n
   }
 
+omit mα in
+lemma addContent_caratheodory_measurable (s : Set α) (hs : s ∈ S)
+  : (μ.toOuterMeasure hAlg.empty_mem μ.empty').IsCaratheodory s := by {
+    unfold OuterMeasure.IsCaratheodory
+    intro t
+    have htsDisjoint : Disjoint (t ∩ s) (t \ s) := by exact Disjoint.symm disjoint_sdiff_inter
+    have htsUnion : t ∩ s ∪ t \ s = t := by exact inter_union_diff t s
+    have hSetRing : IsSetRing S := by exact IsSetAlgebra.isSetRing hAlg
+    -- generalize_proofs hem μem
+    apply le_antisymm
+    · apply measure_le_inter_add_diff
+    · unfold AddContent.toOuterMeasure inducedOuterMeasure OuterMeasure.ofFunction
+      rw [← OuterMeasure.measureOf_eq_coe]
+      simp
+      intro A hA
+      have h: ∀(A : ℕ -> Set α) (hAS : ∀n, A n ∈ S) (n : ℕ),
+        extend (P := Membership.mem S) (fun s x => μ s) (A n) = μ (A n) := by {
+          intro A hAS n;
+          exact extend_eq (fun s x ↦ μ s) (hAS n)
+        }
+      by_cases hAS : ∀n, A n ∈ S
+      · have hans : ∀(A : ℕ -> Set α) (hAS : ∀n, A n ∈ S) n, A n ∩ s ∈ S := by intro A hAS n; exact IsSetRing.inter_mem hSetRing (hAS n) hs
+        have hans2 : ∀(A : ℕ -> Set α) (hAS : ∀n, A n ∈ S) n, A n \ s ∈ S := by intro A hAS n; exact hSetRing.diff_mem (hAS n) hs
+        have hansU : ∀(A : ℕ -> Set α) (hAS : ∀n, A n ∈ S) n, A n ∩ s ∪ A n \ s = A n := by intro A hAS n; exact inter_union_diff (A n) s
+        have hansD : ∀(A : ℕ -> Set α) (hAS : ∀n, A n ∈ S) n, Disjoint (A n ∩ s) (A n \ s) := by {
+          intro A hAS n
+          exact Disjoint.symm disjoint_sdiff_inter
+        }
+        simp_rw [h A hAS]
+
+        rw [show ∑' n, μ (A n) = ∑' n, μ (A n ∩ s) + ∑' n, μ (A n \ s) by {
+          calc ∑' (n : ℕ), μ (A n) = ∑' (n : ℕ), (μ (A n ∩ s) + μ (A n \ s)) := by {
+              congr
+              ext n
+              have h := addContent_union (m := μ) hSetRing (hans A hAS n) (hans2 A hAS n) (hansD A hAS n)
+              rw [hansU A hAS] at h
+              exact h
+            }
+          _ = ∑' (n : ℕ), μ (A n ∩ s) + ∑' (n : ℕ), μ (A n \ s) := ENNReal.tsum_add
+            }]
+        gcongr
+        ·
+          let B n := A n ∩ s
+          have hBS : ∀n, B n ∈ S := by intro n; exact hans A hAS n
+          have hB : t ∩ s ⊆ ⋃ n, A n ∩ s := by
+            calc t ∩ s ⊆ (⋃ n, A n) ∩ s := by exact inter_subset_inter hA fun ⦃a⦄ a ↦ a
+            _ = ⋃ n, A n ∩ s := by rw [iUnion_inter]
+
+          calc ⨅ f : ℕ -> Set α, ⨅ (_ : t ∩ s ⊆ ⋃ n, f n), ∑' n, extend (fun s x ↦ μ s) (f n)
+            <= ⨅ (_ : t ∩ s ⊆ ⋃ n, B n), ∑' n, extend (fun s x ↦ μ s) (B n) := by apply iInf_le
+          _  = ∑' n, extend (fun s x ↦ μ s) (B n) := by simp [B, hB]; rfl
+          _ = ∑' (n : ℕ), μ (B n) := by congr; ext n; exact h B (hans A hAS) n
+          _ = ∑' (n : ℕ), μ (A n ∩ s) := by simp [B]
+        ·
+          let B n := A n \ s
+          have hBS : ∀n, B n ∈ S := by intro n; exact hans2 A hAS n
+          have hB : t \ s ⊆ ⋃ n, A n \ s := by
+            calc t \ s ⊆ (⋃ n, A n) \ s := by exact inter_subset_inter hA fun ⦃a⦄ a ↦ a
+            _ = ⋃ n, A n \ s := by rw [iUnion_diff]
+
+          calc ⨅ f : ℕ -> Set α, ⨅ (_ : t \ s ⊆ ⋃ n, f n), ∑' n, extend (fun s x ↦ μ s) (f n)
+            <= ⨅ (_ : t \ s ⊆ ⋃ n, B n), ∑' n, extend (fun s x ↦ μ s) (B n) := by apply iInf_le
+          _  = ∑' n, extend (fun s x ↦ μ s) (B n) := by simp [B, hB]; rfl
+          _ = ∑' (n : ℕ), μ (B n) := by congr; ext n; exact h B (hans2 A hAS) n
+          _ = ∑' (n : ℕ), μ (A n \ s) := by simp [B]
+      · push_neg at hAS
+        obtain ⟨n, hn⟩ := hAS
+        suffices ∞ <= ∑' (i : ℕ), extend (fun s x ↦ μ s) (A i) by {
+          rw [@top_le_iff] at this
+          rw [this]
+          simp
+        }
+        calc ⊤ = extend (P := Membership.mem S) (fun s x ↦ μ s) (A n) := Eq.symm (extend_eq_top (fun s x ↦ μ s) hn)
+          _ <= ∑' n, extend (fun s x ↦ μ s) (A n) := by exact ENNReal.le_tsum n
+}
 
 
 end MeasureTheory
