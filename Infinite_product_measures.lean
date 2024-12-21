@@ -420,212 +420,30 @@ theorem extend_iUnion_le_tsum_nat' {α : Type u_1} {P : Set α → Prop}
 #check MeasureTheory.inducedOuterMeasure_caratheodory
 theorem existence_of_measures [mα : MeasurableSpace α] (hSG : mα = generateFrom S)
   {μ : AddContent S} (hS : IsSetAlgebra S) (hμ : μ.sAdditive)
-  : ∃! ν : Measure α, ∀s ∈ S,  ν s = μ s := by {
-    let μ' := λ s : Set α => λ p : s ∈ S => μ s
-    let ν := MeasureTheory.inducedOuterMeasure μ'
-      (hS.empty_mem) (addContent_empty)
+  : ∃ ν : Measure α, ∀s ∈ S,  ν s = μ s := by {
+    let μ' := μ.toOuterMeasure (hS.empty_mem) (μ.empty')
+    have hν : mα <= μ'.caratheodory := by {
+      have hSC : ∀s ∈ S, μ'.IsCaratheodory s := by intro s hs; exact addContent_caratheodory_measurable μ hS s hs
+      rw [hSG]
+      refine (generateFrom_le_iff μ'.caratheodory).mpr ?_
+      intro s hs
+      exact hSC s hs
+    }
+    let ν := μ'.toMeasure hν
     have hν : ∀s ∈ S, ν s = μ s := by {
       intro s hs
-      suffices ν s <= μ s ∧ ν s >= μ s by exact le_antisymm this.1 this.2
-      constructor
-      · unfold ν inducedOuterMeasure OuterMeasure.ofFunction
-        simp
-        rw [← @OuterMeasure.measureOf_eq_coe]
-        simp
-        rw [show μ s = μ' s hs by rfl]
-        rw [<- MeasureTheory.extend_eq μ' hs]
-        let f : ℕ -> Set α := fun n => if n = 0 then s else ∅
-        apply csInf_le
-        unfold BddBelow lowerBounds
-        rw [@nonempty_def]
-        use 0
-        simp
-        simp
-        use f
-        have h : s ⊆ ⋃ i, f i := by {
-          unfold f
-          intro x hx
-          simp
-          assumption
-        }
-        simp [h]
-        unfold f
-        have h : ∀n : ℕ, MeasureTheory.extend μ' (if n = 0 then s else ∅) =
-          if n = 0 then MeasureTheory.extend μ' s else 0 := by {
-            intro n
-            by_cases n = 0
-            simp [*]
-            simp [*]
-            rw [MeasureTheory.extend_eq μ' hS.empty_mem]
-            simp [μ']
-          }
-        simp_rw [h]
-        simp
-      · rw [ge_iff_le]
-        rw [show μ s = μ' s hs by rfl]
-        -- rw [<- MeasureTheory.extend_eq μ' hs]
-        unfold ν
-        -- rw [← @OuterMeasure.measureOf_eq_coe]
-        -- unfold OuterMeasure.measureOf
-        unfold inducedOuterMeasure
-        unfold OuterMeasure.ofFunction
-        rw [← @OuterMeasure.measureOf_eq_coe]
-        simp
-        intro A hi
-        rw [<- MeasureTheory.extend_eq μ' hs]
-        have hemp : μ' ∅ hS.empty_mem = 0 := by unfold μ'; exact addContent_empty
-        let P s := s ∈ S
-        have hss : ∀ ⦃s₁ s₂ : Set α⦄ (hs₁ : P s₁) (hs₂ : P s₂), s₁ ⊆ s₂ → μ' s₁ hs₁ ≤ μ' s₂ hs₂ := by {
-          intro s t hs ht hst
-          unfold μ'
-          apply addContent_mono
-          exact SetAlgebraIsSetSemiRing hS
-          unfold P at *
-          all_goals assumption
-        }
-        -- have h1 := extend_mono' hss hs hi
-        -- have h2 : MeasureTheory.extend μ' (⋃ i, A i ∩ s) <= ∑' (i : ℕ), MeasureTheory.extend μ' (A i ∩ s) := by {
-        have hsss : ⋃ i, A i ∩ s = s := by {
-          rw [← @right_eq_inter, @iUnion_inter] at hi
-          exact hi.symm
-        }
-        have h2 : MeasureTheory.extend μ' (⋃ i, A i ∩ s) <= ∑' (i : ℕ), MeasureTheory.extend μ' (A i ∩ s) := by {
-          -- rw [<- hsss]
-          apply extend_iUnion_le_tsum_nat'
-          intro hm
-          unfold μ'
-          have h' : μ.sSubAdditive := sAdditive_implies_sSubAdditive μ hμ
-          unfold AddContent.sSubAdditive at h'
-          specialize h' hm
-          rw [hsss] at *
-          specialize h' hs
-          exact h'
-          intros
-          simp only [hsss, hs]
-        }
-        rw [<- hsss]
-        -- trans ∑' (i : ℕ), MeasureTheory.extend μ' (A i ∩ s)
-        trans greater h2 <;> unfold greater
-        exact h2
-        gcongr
-        rename_i n
-        have h : A n ∩ s ⊆ A n := by exact inter_subset_left
-
-        unfold MeasureTheory.extend
-        simp
-        intro i
-        have has : A n ∩ s ∈ S := by exact IsSetAlgebra.inter_mem hS i hs
-        simp [has]
-        unfold μ'
-        exact hss has i h
-        }
-    have h : ∀s ∈ S, ν.IsCaratheodory s := by {
-      intro s hs
-      rw [show ν.IsCaratheodory = fun s ↦ ∀ (t : Set α), ν t = ν (t ∩ s) + ν (t \ s) from rfl]
-      intro t
-      rw [le_antisymm_iff]
-      constructor
-      · nth_rw 1 [show t = t ∩ s ∪ t \ s by exact Eq.symm (inter_union_diff t s)]
-        apply measure_union_le
-      · unfold ν inducedOuterMeasure OuterMeasure.ofFunction
-        rw [← @OuterMeasure.measureOf_eq_coe]
-        simp
-        intro A ht
-        let B := fun n => A n ∩ s
-        let C := fun n => A n \ s
-        have hB : t ∩ s ⊆ ⋃ n, B n := by {
-          simp [B, *]
-          rw [show ⋃ n, A n ∩ s = (⋃ n, A n) ∩ s by exact Eq.symm (iUnion_inter s A)]
-          exact inter_subset_inter ht fun ⦃a⦄ a ↦ a
-        }
-        have hC : t \ s ⊆ ⋃ n, C n := by {
-          simp [C, *]
-          rw [show ⋃ n, A n \ s = (⋃ n, A n) \ s by exact Eq.symm (iUnion_inter sᶜ A)]
-          exact inter_subset_inter ht fun ⦃a⦄ a ↦ a
-        }
-        -- apply csInf_le
-        have h1 : (⨅ f : ℕ -> Set α, ⨅ (_ : t ∩ s ⊆ ⋃ i, f i), ∑' (i : ℕ), MeasureTheory.extend μ' (f i))
-        <= ⨅ (_ : t ∩ s ⊆ ⋃ i, B i), ∑' (i : ℕ), MeasureTheory.extend μ' (B i) := by {
-          apply iInf_le
-        }
-        have h11 :
-        ⨅ (_ : t ∩ s ⊆ ⋃ i, B i), ∑' (i : ℕ), MeasureTheory.extend μ' (B i)
-        <= ∑' (i : ℕ), MeasureTheory.extend μ' (B i) := by {
-          apply iInf_le
-          assumption
-        }
-
-        have h2 : (⨅ f : ℕ -> Set α, ⨅ (_ : t \ s ⊆ ⋃ i, f i), ∑' (i : ℕ), MeasureTheory.extend μ' (f i))
-        <= ⨅ (_ : t \ s ⊆ ⋃ i, C i), ∑' (i : ℕ), MeasureTheory.extend μ' (C i) := by {
-          apply iInf_le
-        }
-        have h22 :
-        ⨅ (_ : t \ s ⊆ ⋃ i, C i), ∑' (i : ℕ), MeasureTheory.extend μ' (C i)
-        <= ∑' (i : ℕ), MeasureTheory.extend μ' (C i) := by {
-          apply iInf_le
-          assumption
-        }
-
-        let h111 :=  le_trans h1 h11
-        let h222 :=  le_trans h2 h22
-
-
-        have hABC :
-        ∑' (i : ℕ), MeasureTheory.extend μ' (B i) +
-        ∑' (i : ℕ), MeasureTheory.extend μ' (C i) <=
-        ∑' (i : ℕ), MeasureTheory.extend μ' (A i)
-          := by {
-            rw [show ∑' (i : ℕ), MeasureTheory.extend μ' (B i) +
-            ∑' (i : ℕ), MeasureTheory.extend μ' (C i) =
-            ∑' (i : ℕ), (MeasureTheory.extend μ' (B i) + MeasureTheory.extend μ' (C i)) by {
-              exact Eq.symm ENNReal.tsum_add
-            }]
-            have hhh : ∀n, MeasureTheory.extend μ' (B n)
-              + MeasureTheory.extend μ' (C n) <=
-              MeasureTheory.extend μ' (A n)
-              := by {
-                intro n
-                unfold MeasureTheory.extend
-                simp [B,C]
-                by_cases ha : A n ∈ S
-                · have hb : B n ∈ S := by unfold B; exact IsSetAlgebra.inter_mem hS ha hs
-                  have hc : C n ∈ S := by unfold C; exact IsSetAlgebra.diff_mem hS ha hs
-                  simp [ha, hb, hc, μ']
-                  have hbc : Disjoint (A n ∩ s) (A n \ s) := by exact Disjoint.symm disjoint_sdiff_inter
-                  suffices μ (A n ∩ s) + μ (A n \ s) = μ (A n) by {
-                    exact le_of_eq this
-                  }
-                  have hbcu : A n ∩ s ∪ A n \ s = A n := by exact inter_union_diff (A n) s
-                  let h := μ.additive (A n ∩ s) (A n \ s) hbc
-                  rw [hbcu] at h
-                  exact h.symm
-                · simp [ha]
-            }
-            exact ENNReal.tsum_le_tsum hhh
-          }
-        -- have hle (a b c d : ℝ) : a <= b -> c <= d -> a+ c <= b + d := by exact fun a_1 a_2 ↦
-        --   add_le_add a_1 a_2
-        exact le_trans (add_le_add h111 h222) hABC
+      have hμμ' : μ s = μ' s := by exact Eq.symm (addContent_outer_measure_equal_on_S μ hS s hs hμ)
+      rw [hμμ']
+      unfold ν
+      simp [OuterMeasure.toMeasure]
+      have hsM : MeasurableSet s := by {
+        have h := measurableSet_generateFrom hs
+        rw [<- hSG] at h
+        exact h
+      }
+      apply Measure.ofMeasurable_apply s hsM
     }
-
-    -- have h : ∀s : Set α, Measurable s -> ν.IsCaratheodory s := by {
-    --   intro s hs
-    --   induction s hs using induction_on_inter with
-    --   | h_eq =>
-    -- apply ExistsUnique.intro ν
-    have hν : mα <= ν.caratheodory := by {
-      sorry
-    }
-    let ν' := ν.toMeasure hν
-    have hν' : ∀s ∈ S, μ s = ν' s := by {
-      intro s hs
-      unfold ν'
-      -- simp [ν', OuterMeasure.toMeasure, ν, inducedOuterMeasure, Measure.ofMeasurable,
-      -- OuterMeasure.ofFunction]
-      -- rw [← measureOf_eq_coe]
-      -- simp [OuterMeasure.ofFunction]
-
-    }
+    use ν
   }
 
 
