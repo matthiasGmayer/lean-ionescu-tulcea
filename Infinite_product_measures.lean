@@ -13,233 +13,6 @@ noncomputable section
 
 
 /- Now write definitions and theorems. -/
-namespace MeasureTheory
-
-theorem SetAlgebraIsSetSemiRing (h1 : IsSetAlgebra S) : IsSetSemiring S := by {
-  refine IsSetRing.isSetSemiring ?_
-  exact IsSetAlgebra.isSetRing h1
-}
-
--- def LE.lesser [les : LE α] (x : les.le a b) := a
-def lesser {α : Type} [LE α] {x y : α} (h : x ≤ y) : α :=
-  x
-def greater {α : Type} [LE α] {x y : α} (h : x ≤ y) : α :=
-  y
-
-
-open Filter Topology
-
-variable {α : Type*} {S : Set (Set α)} [mα : MeasurableSpace α] (μ : AddContent S)
-
-
-lemma AddContent.additive (A B : Set α) (hAB : Disjoint A B) : μ (A ∪ B) = μ A + μ B := by {
-  sorry
-}
--- lemma AddContent.mono (A B : Set α) (hAB : Disjoint A B) : μ (A ∪ B) = μ A + μ B := by {
---   sorry
--- }
-  -- := by {
-
-  -- }
-
-def AddContent.sAdditive : Prop :=
-  ∀⦃A : ℕ → Set α⦄, (∀ i, (A i) ∈ S) -> (⋃ i, A i ∈ S) → Pairwise (Disjoint on A) →
-    μ (⋃ i, A i) = ∑' i, μ (A i)
-
-def AddContent.sSubAdditive  : Prop :=
-  ∀⦃A : ℕ → Set α⦄, (∀ i, (A i) ∈ S) -> (⋃ i, A i ∈ S) →
-    μ (⋃ i, A i) <= ∑' i, μ (A i)
-
-def AddContent.sContinuousFromBelow  : Prop :=
-  ∀⦃A : ℕ → Set α⦄ {B : Set α }, (∀ i, (A i) ∈ S) -> (B ∈ S) ->
-  (Tendsto A atTop (𝓝[≤] B)) ->
-  Tendsto (λ n => μ (A n)) atTop (𝓝 (μ B))
-
-def AddContent.sContinuousFromAbove  : Prop :=
-  ∀⦃A : ℕ → Set α⦄ (B : Set α), (∀ i, (A i) ∈ S) -> (B ∈ S) -> (μ (A 0) < ∞) ->
-  (Tendsto A atTop (𝓝[≥] B)) ->
-  Tendsto (λ n => μ (A n)) atTop (𝓝 (μ B))
-
-def AddContent.sContinuousInEmpty  : Prop :=
-  ∀⦃A : ℕ → Set α⦄, (∀ i, (A i) ∈ S) -> (μ (A 0) < ∞) ->
-  (Tendsto A atTop (𝓝 ∅)) ->
-  Tendsto (λ n => μ (A n)) atTop (𝓝 0)
-
-lemma sAdditive_implies_sSubAdditive : μ.sAdditive -> μ.sSubAdditive := sorry
-lemma sSubAdditive_implies_sAdditive : μ.sSubAdditive -> μ.sAdditive := sorry
-
-lemma sAdditive_implies_sContinuousFromBelow : μ.sAdditive -> μ.sContinuousFromBelow := sorry
-lemma sContinuousFromBelow_implies_sAdditive : μ.sContinuousFromBelow -> μ.sAdditive := sorry
-
-lemma sContinuousFromAbove_implies_sContinuousInEmpty : μ.sContinuousFromAbove -> μ.sContinuousInEmpty := sorry
-lemma sContinuousInEmpty_implies_sContinuousFromAbove : μ.sContinuousInEmpty -> μ.sContinuousFromAbove := sorry
-
-lemma sAdditive_implies_sContinuousInEmpty : μ.sAdditive -> μ.sContinuousInEmpty := sorry
-
-lemma sContinuousInEmpty_finite_implies_sAdditive : μ.sContinuousInEmpty ∧ μ univ < ∞ -> μ.sAdditive := sorry
-
-  -- ∀⦃A : ℕ → Set α⦄, (∀ i, (A i) ∈ S) -> (μ (A 0) < ∞) ->
-  -- (Tendsto A atTop (𝓝[≥] B)) ->
-  --   Tendsto (λ n => μ (A n)) atTop (𝓝 0)
-
-
-def AddContent.toOuterMeasure :=
-    inducedOuterMeasure (λ s : Set α => λ _ : s ∈ S => μ s)
-
-variable (hAlg : IsSetAlgebra S)
-
-lemma addContent_outer_measure_equal_on_S (s : Set α) (hs : s ∈ S) (hμ : μ.sAdditive)
-  : μ.toOuterMeasure hAlg.empty_mem μ.empty' s = μ s := by {
-      -- generalize h : μ.toOuterMeasure hAlg.empty_mem μ.empty' = ν
-      let ν := μ.toOuterMeasure hAlg.empty_mem μ.empty'
-      suffices ν s <= μ s ∧ ν s >= μ s by exact le_antisymm this.1 this.2
-      constructor
-      ·
-        unfold ν AddContent.toOuterMeasure inducedOuterMeasure OuterMeasure.ofFunction
-        rw [← @OuterMeasure.measureOf_eq_coe]
-        simp
-        let f : ℕ -> Set α := fun n => if n = 0 then s else ∅
-        have hf : ⋃ i, f i = s := by ext; simp [f]
-        calc
-        ⨅ f : ℕ -> Set α, ⨅ (_ : s ⊆ ⋃ i, f i), ∑' (i : ℕ), extend (fun s x ↦ μ s) (f i)
-        <= ⨅ (_ : s ⊆ ⋃ i, f i), ∑' (i : ℕ),
-          extend (P := Membership.mem S) (fun s x ↦ μ s) (f i) := by apply iInf_le
-        _ =  ∑' (i : ℕ), extend (P := Membership.mem S) (fun s x ↦ μ s) (f i) := by simp [hf]
-        _ =  μ s := by {
-          unfold f
-          simp [apply_ite, extend_eq (fun s x => μ s)]
-          rw [show extend (P := Membership.mem S) (fun s x => μ s) s = μ s by {
-            exact extend_eq (fun s x ↦ μ s) hs
-          }]
-          rw [show extend (P := Membership.mem S) (fun s x => μ s) ∅ = 0 by {
-            have h := extend_eq (fun s x ↦ μ s) hAlg.empty_mem
-            simp at h
-            exact h
-          }]
-          simp
-        }
-      ·
-        rw [ge_iff_le]
-        unfold ν AddContent.toOuterMeasure inducedOuterMeasure OuterMeasure.ofFunction
-        rw [← OuterMeasure.measureOf_eq_coe]
-        simp
-        intro A hA
-        by_cases hAS : ∀n, A n ∈ S
-        ·
-          calc μ s = μ ((⋃n, A n) ∩ s) := by rw [inter_eq_self_of_subset_right hA]
-          _ = μ (⋃ n, A n ∩ s) := by rw [@iUnion_inter]
-          _ <= ∑' n, μ (A n ∩ s) := by {
-            apply sAdditive_implies_sSubAdditive μ hμ
-            intro n; exact IsSetAlgebra.inter_mem hAlg (hAS n) hs
-            suffices ⋃ n, A n ∩ s = s by exact mem_of_eq_of_mem this hs
-            simp [<- iUnion_inter, inter_eq_self_of_subset_right, hA]
-          }
-          _ <= ∑' n, μ (A n) := by {
-            gcongr
-            rename_i n
-            specialize hAS n
-            have h : A n ∩ s ∈ S := by exact IsSetAlgebra.inter_mem hAlg hAS hs
-            have h' : A n ∩ s ⊆ A n := by exact inter_subset_left
-            have hA : IsSetSemiring S := by exact SetAlgebraIsSetSemiRing hAlg
-            apply addContent_mono hA h hAS h'
-          }
-          _ = ∑' n, extend (fun s x ↦ μ s) (A n) := by {
-            congr; ext n
-            exact Eq.symm (extend_eq (fun s x ↦ μ s) (hAS n))
-          }
-        ·
-          suffices ∞ <= ∑' n, extend (P := Membership.mem S) (fun s x ↦ μ s) (A n) by {
-            rw [@top_le_iff] at this
-            rw [this]
-            simp
-          }
-          push_neg at hAS
-          obtain ⟨n, hn⟩ := hAS
-          calc ∞ = extend (P := Membership.mem S) (fun s x => μ s) (A n) := by {
-            unfold extend
-            simp [hn]
-          }
-          _ <= ∑' n, extend (fun s x ↦ μ s) (A n) := by exact ENNReal.le_tsum n
-  }
-
-omit mα in
-lemma addContent_caratheodory_measurable (s : Set α) (hs : s ∈ S)
-  : (μ.toOuterMeasure hAlg.empty_mem μ.empty').IsCaratheodory s := by {
-    unfold OuterMeasure.IsCaratheodory
-    intro t
-    have htsDisjoint : Disjoint (t ∩ s) (t \ s) := by exact Disjoint.symm disjoint_sdiff_inter
-    have htsUnion : t ∩ s ∪ t \ s = t := by exact inter_union_diff t s
-    have hSetRing : IsSetRing S := by exact IsSetAlgebra.isSetRing hAlg
-    -- generalize_proofs hem μem
-    apply le_antisymm
-    · apply measure_le_inter_add_diff
-    · unfold AddContent.toOuterMeasure inducedOuterMeasure OuterMeasure.ofFunction
-      rw [← OuterMeasure.measureOf_eq_coe]
-      simp
-      intro A hA
-      have h: ∀(A : ℕ -> Set α) (hAS : ∀n, A n ∈ S) (n : ℕ),
-        extend (P := Membership.mem S) (fun s x => μ s) (A n) = μ (A n) := by {
-          intro A hAS n;
-          exact extend_eq (fun s x ↦ μ s) (hAS n)
-        }
-      by_cases hAS : ∀n, A n ∈ S
-      · have hans : ∀(A : ℕ -> Set α) (hAS : ∀n, A n ∈ S) n, A n ∩ s ∈ S := by intro A hAS n; exact IsSetRing.inter_mem hSetRing (hAS n) hs
-        have hans2 : ∀(A : ℕ -> Set α) (hAS : ∀n, A n ∈ S) n, A n \ s ∈ S := by intro A hAS n; exact hSetRing.diff_mem (hAS n) hs
-        have hansU : ∀(A : ℕ -> Set α) (hAS : ∀n, A n ∈ S) n, A n ∩ s ∪ A n \ s = A n := by intro A hAS n; exact inter_union_diff (A n) s
-        have hansD : ∀(A : ℕ -> Set α) (hAS : ∀n, A n ∈ S) n, Disjoint (A n ∩ s) (A n \ s) := by {
-          intro A hAS n
-          exact Disjoint.symm disjoint_sdiff_inter
-        }
-        simp_rw [h A hAS]
-
-        rw [show ∑' n, μ (A n) = ∑' n, μ (A n ∩ s) + ∑' n, μ (A n \ s) by {
-          calc ∑' (n : ℕ), μ (A n) = ∑' (n : ℕ), (μ (A n ∩ s) + μ (A n \ s)) := by {
-              congr
-              ext n
-              have h := addContent_union (m := μ) hSetRing (hans A hAS n) (hans2 A hAS n) (hansD A hAS n)
-              rw [hansU A hAS] at h
-              exact h
-            }
-          _ = ∑' (n : ℕ), μ (A n ∩ s) + ∑' (n : ℕ), μ (A n \ s) := ENNReal.tsum_add
-            }]
-        gcongr
-        ·
-          let B n := A n ∩ s
-          have hBS : ∀n, B n ∈ S := by intro n; exact hans A hAS n
-          have hB : t ∩ s ⊆ ⋃ n, A n ∩ s := by
-            calc t ∩ s ⊆ (⋃ n, A n) ∩ s := by exact inter_subset_inter hA fun ⦃a⦄ a ↦ a
-            _ = ⋃ n, A n ∩ s := by rw [iUnion_inter]
-
-          calc ⨅ f : ℕ -> Set α, ⨅ (_ : t ∩ s ⊆ ⋃ n, f n), ∑' n, extend (fun s x ↦ μ s) (f n)
-            <= ⨅ (_ : t ∩ s ⊆ ⋃ n, B n), ∑' n, extend (fun s x ↦ μ s) (B n) := by apply iInf_le
-          _  = ∑' n, extend (fun s x ↦ μ s) (B n) := by simp [B, hB]; rfl
-          _ = ∑' (n : ℕ), μ (B n) := by congr; ext n; exact h B (hans A hAS) n
-          _ = ∑' (n : ℕ), μ (A n ∩ s) := by simp [B]
-        ·
-          let B n := A n \ s
-          have hBS : ∀n, B n ∈ S := by intro n; exact hans2 A hAS n
-          have hB : t \ s ⊆ ⋃ n, A n \ s := by
-            calc t \ s ⊆ (⋃ n, A n) \ s := by exact inter_subset_inter hA fun ⦃a⦄ a ↦ a
-            _ = ⋃ n, A n \ s := by rw [iUnion_diff]
-
-          calc ⨅ f : ℕ -> Set α, ⨅ (_ : t \ s ⊆ ⋃ n, f n), ∑' n, extend (fun s x ↦ μ s) (f n)
-            <= ⨅ (_ : t \ s ⊆ ⋃ n, B n), ∑' n, extend (fun s x ↦ μ s) (B n) := by apply iInf_le
-          _  = ∑' n, extend (fun s x ↦ μ s) (B n) := by simp [B, hB]; rfl
-          _ = ∑' (n : ℕ), μ (B n) := by congr; ext n; exact h B (hans2 A hAS) n
-          _ = ∑' (n : ℕ), μ (A n \ s) := by simp [B]
-      · push_neg at hAS
-        obtain ⟨n, hn⟩ := hAS
-        suffices ∞ <= ∑' (i : ℕ), extend (fun s x ↦ μ s) (A i) by {
-          rw [@top_le_iff] at this
-          rw [this]
-          simp
-        }
-        calc ⊤ = extend (P := Membership.mem S) (fun s x ↦ μ s) (A n) := Eq.symm (extend_eq_top (fun s x ↦ μ s) hn)
-          _ <= ∑' n, extend (fun s x ↦ μ s) (A n) := by exact ENNReal.le_tsum n
-}
-
-
-end MeasureTheory
 
 namespace ProductProbabilityMeasure
 open MeasureTheory MeasurableSpace Measurable ProductLike
@@ -363,6 +136,164 @@ def FiniteCompMeasureKernelNat
   }
 
 
+
+
+
+#check squareCylinders
+
+-- #check {1,n} : Set ℕ
+
+--  (squareCylinders fun (i : ℕ) => {s : Set (α i) | MeasurableSet s})
+--  := (squareCylinders fun (i : ℕ) => {s : Set (α i) | MeasurableSet s})
+
+def cylinder_n (α : ℕ -> Type*) (n : ℕ) [mα :∀n, MeasurableSpace (α n)]
+ := ({k | k <= n}.restrict ⁻¹' ·) '' {T : Set (∀k : {k | k <= n}, α k)| MeasurableSet T}
+
+-- #check measurableCylinders
+def cylinders (α : ℕ -> Type*) [mα :∀n, MeasurableSpace (α n)] := ⋃n, cylinder_n α n
+
+lemma Surj_emp (f : α -> β) (hf : Surjective f) (hS : f ⁻¹' S = ∅) : S = ∅  := by {
+  rw [show ∅ = f ⁻¹' ∅ by exact rfl] at hS
+  exact (preimage_eq_preimage hf).mp (id (Eq.symm hS)).symm
+}
+
+
+-- lemma test (S : Finset α) (f : α -> ℝ) : ∑ s ∈ S, f s = ∑ s : S, f s.1 := by {
+--   exact Eq.symm (Finset.sum_coe_sort S f)
+-- }
+
+def MeasureKernelSequenceContent
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]
+  (μ : Measure (α 0))
+  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  : AddContent (cylinders α) where
+    toFun s :=
+      if h : ∃n, s ∈ cylinder_n α n then
+        have h' := Nat.find_spec h
+        let n := Nat.find h
+        let T := choose h'
+        FiniteCompMeasureKernelNat n μ K T
+      else 0
+    empty' := by {
+      simp
+      intro n h
+      generalize_proofs h1 h2
+      have ⟨_,h3⟩ := choose_spec h2
+      have h' : choose h2 = ∅ := by {
+        have g : Surjective ({x | x <= Nat.find h1}.restrict (π := α)) := by {
+          unfold Surjective
+          intro b
+          exact Subtype.exists_pi_extension b
+        }
+        exact Surj_emp {x | x ≤ Nat.find h1}.restrict g h3
+      }
+      rw [h']
+      simp
+    }
+    sUnion' := by {
+      intro S hS pwd Urec
+      simp [Urec]
+      have h0 (s : S) : ∃ n, s.1 ∈ cylinder_n α n := by {
+        specialize hS s.2
+        exact mem_iUnion.mp hS
+      }
+      have h0' (s : S)  := Nat.find_spec (h0 s)
+      -- ∃ x_1, MeasurableSet x_1 ∧ {x_2 | x_2 ≤ Nat.find (h0 s hs)}.restrict ⁻¹' x_1 = s := by {
+      --   specialize h0 s hs
+      --   unfold cylinder_n at h0
+      -- }
+      have h' : ∃ n, ⋃₀ S ∈  cylinder_n α n := by exact mem_iUnion.mp Urec
+      simp [h']
+
+      generalize_proofs h1 h2 h3
+      have hhh
+  --     : (@Finset.sum (Set ((a : ℕ) → α a)) ℝ≥0∞ NonUnitalNonAssocSemiring.toAddCommMonoid S fun x ↦
+  -- if h : ∃ n, x ∈ cylinder_n α n then (FiniteCompMeasureKernelNat (Nat.find (h2 x h)) μ K) (choose (h3 x h)) else 0 : ℝ≥0∞)
+  --       =
+  --       ∑ s : S, (FiniteCompMeasureKernelNat (Nat.find (h0 s)) μ K) (choose (h0' s))
+        := by
+         calc
+        ∑ x ∈ S, (if h : ∃ n, x ∈ cylinder_n α n
+          then (FiniteCompMeasureKernelNat (Nat.find (h2 x h)) μ K) (choose (h3 x h)) else 0)
+        = ∑ s : S, (if h : ∃ n, s.1 ∈ cylinder_n α n
+          then (FiniteCompMeasureKernelNat (Nat.find (h2 s.1 h)) μ K) (choose (h3 s.1 h)) else 0)
+            := by symm; apply Finset.sum_coe_sort S (fun s => (if h : ∃ n, s ∈ cylinder_n α n
+                  then (FiniteCompMeasureKernelNat (Nat.find (h2 s h)) μ K) (choose (h3 s h)) else 0))
+        _ = ∑ s : S, (FiniteCompMeasureKernelNat (Nat.find (h0 s)) μ K) (choose (h0' s)) := by {
+          congr
+          ext s
+          simp [h0 s]
+      }
+      have hgoal :(FiniteCompMeasureKernelNat (Nat.find h') μ K) (choose h1) =
+        (@Finset.sum (Set ((a : ℕ) → α a)) ℝ≥0∞ NonUnitalNonAssocSemiring.toAddCommMonoid S fun x ↦
+          if h : ∃ n, x ∈ cylinder_n α n then (FiniteCompMeasureKernelNat (Nat.find (h2 x h)) μ K) (choose (h3 x h)) else 0 : ℝ≥0∞)
+          := by {
+            rw [hhh]
+
+
+          }
+      -- rw [hhh]
+      exact hgoal
+}
+
+
+lemma rectangles_SetAlgebra (α : ℕ -> Type* ) [mα : ∀n, MeasurableSpace (α n)]: IsSetAlgebra (rectangles α) := by {
+  sorry
+}
+
+
+-- def rectangles (α : ℕ -> Type*) [mα : ∀n, MeasurableSpace (α n)]
+--  := {S : Set (∀n, α n) | ∃n T, MeasurableSet T ∧ S = {k | k <= n}.restrict ⁻¹' T}
+-- def KernelSequenceContent
+--   (n : ℕ)
+--   {α : ℕ -> Type*}
+--   [∀m, MeasurableSpace (α m)]
+--   [∀m, Inhabited (α m)]
+--   (μ : Measure (α 0))
+--   (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+--   : AddContent (rectangles α)  where
+--     toFun s := if h : s ∈ (rectangles α) then by {
+--       unfold rectangles at h
+--       simp at h
+--       have hn := Classical.choose_spec h
+--       generalize choose h = n at hn
+--       have hT := Classical.choose_spec hn
+--       generalize choose hn = T at hT
+--       exact FiniteCompMeasureKernelNat n μ K T
+--     } else 0
+--     empty' := by {
+--       simp
+--       intro h
+--       generalize_proofs h1 h2
+--       have ⟨_,h3⟩ := choose_spec h2
+--       have h' : choose h2 = ∅ := by {
+--         have g : Surjective ({x | x <= choose h1}.restrict (π := α)) := by {
+--           unfold Surjective
+--           intro b
+--           exact Subtype.exists_pi_extension b
+--         }
+--         exact Surj_emp {x | x ≤ choose h1}.restrict g (id (Eq.symm h3))
+--       }
+--       rw [h']
+--       simp
+--     }
+--     sUnion' := by {
+--       intro S hS pwd Urec
+--       simp [Urec]
+--       -- generalize_proofs h1 h2 hx1 hx2
+--       sorry
+
+
+--     }
+-- }
+
+
+
+
+
+
 #check Measure.ext_of_generateFrom_of_iUnion
 #check MeasureTheory.ext_of_generate_finite
 theorem uniqeness_of_prob_measures [mα : MeasurableSpace α] (μ ν : ProbabilityMeasure α)
@@ -384,70 +315,6 @@ theorem uniqeness_of_prob_measures [mα : MeasurableSpace α] (μ ν : Probabili
       exact tsum_congr fun b ↦ hi b
     }
   }
-
-
-#check extend_iUnion_le_tsum_nat'
-
-theorem extend_iUnion_le_tsum_nat' {α : Type u_1} {P : Set α → Prop}
-{m : (s : Set α) → P s → ENNReal}
-(s : ℕ → Set α)
-  (PU : (∀ (i : ℕ), P (s i)) → P (⋃ i, s i))
-  (msU : ∀ (hm : ∀ (i : ℕ), P (s i)), m (⋃ i, s i) (PU hm) ≤ ∑' (i : ℕ), m (s i) (hm i))
-  : MeasureTheory.extend m (⋃ i, s i) ≤ ∑' (i : ℕ), MeasureTheory.extend m (s i)
-   := by
-  by_cases h : ∀ i, P (s i)
-  · rw [extend_eq _ (PU h), congr_arg tsum _]
-    · apply msU h
-    funext i
-    apply extend_eq _ (h i)
-  · cases' not_forall.1 h with i hi
-    exact le_trans (le_iInf fun h => hi.elim h) (ENNReal.le_tsum i)
-
-#check inducedOuterMeasure_eq_extend'
-
--- theorem inducedOuterMeasure_eq_extend'
--- {α : Type u_1} {P : Set α → Prop} {m : (s : Set α) → P s → ENNReal}
---   {P0 : P ∅} {m0 : m ∅ P0 = 0} (PU : ∀ ⦃f : ℕ → Set α⦄, (∀ (i : ℕ), P (f i)) → P (⋃ i, f i))
---   (msU : ∀ ⦃f : ℕ → Set α⦄ (hm : ∀ (i : ℕ), P (f i)), m (⋃ i, f i) ⋯ ≤ ∑' (i : ℕ), m (f i) ⋯)
---   (m_mono : ∀ ⦃s₁ s₂ : Set α⦄ (hs₁ : P s₁) (hs₂ : P s₂), s₁ ⊆ s₂ → m s₁ hs₁ ≤ m s₂ hs₂)
---   {s : Set α} (hs : P s) :
---   (inducedOuterMeasure m P0 m0) s = MeasureTheory.extend m s := by {
---     ofFunction_eq s (fun _t => extend_mono' m_mono hs) (extend_iUnion_le_tsum_nat' PU msU)
---   }
-
-
-#check MeasureTheory.OuterMeasure.toMeasure
-#check MeasureTheory.inducedOuterMeasure_caratheodory
-theorem existence_of_measures [mα : MeasurableSpace α] (hSG : mα = generateFrom S)
-  {μ : AddContent S} (hS : IsSetAlgebra S) (hμ : μ.sAdditive)
-  : ∃ ν : Measure α, ∀s ∈ S,  ν s = μ s := by {
-    let μ' := μ.toOuterMeasure (hS.empty_mem) (μ.empty')
-    have hν : mα <= μ'.caratheodory := by {
-      have hSC : ∀s ∈ S, μ'.IsCaratheodory s := by intro s hs; exact addContent_caratheodory_measurable μ hS s hs
-      rw [hSG]
-      refine (generateFrom_le_iff μ'.caratheodory).mpr ?_
-      intro s hs
-      exact hSC s hs
-    }
-    let ν := μ'.toMeasure hν
-    have hν : ∀s ∈ S, ν s = μ s := by {
-      intro s hs
-      have hμμ' : μ s = μ' s := by exact Eq.symm (addContent_outer_measure_equal_on_S μ hS s hs hμ)
-      rw [hμμ']
-      unfold ν
-      simp [OuterMeasure.toMeasure]
-      have hsM : MeasurableSet s := by {
-        have h := measurableSet_generateFrom hs
-        rw [<- hSG] at h
-        exact h
-      }
-      apply Measure.ofMeasurable_apply s hsM
-    }
-    use ν
-  }
-
-
-
 
 
 
