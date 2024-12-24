@@ -37,40 +37,66 @@ instance : ProdLikeM (α × β) α β := ⟨MeasurableEquiv.refl (α × β)⟩
 
 def ProdLikeM.symm (p : ProdLikeM F α β) : ProdLikeM F β α := ⟨trans p.equiv prodComm⟩
 
-def ProdLikeM.fst (P : ProdLikeM F α β) := α
-def ProdLikeM.snd (P : ProdLikeM F α β) := β
+def ProdLikeM.fst_type (P : ProdLikeM F α β) := α
+def ProdLikeM.snd_type (P : ProdLikeM F α β) := β
+
+def ProdLikeM.fst (P : ProdLikeM F α β) (x : P) : α := (P.equiv x).fst
+def ProdLikeM.snd (P : ProdLikeM F α β) (x : P) : β := (P.equiv x).snd
 
 
 def change_left [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
   (K : Kernel α β) (τ : α ≃ᵐ γ) : Kernel γ β := K.comap τ.invFun τ.measurable_invFun
 
 def change_right [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
-  (K : Kernel α β) (τ : β ≃ᵐ γ) : Kernel α γ := K.comapRight τ.symm.measurableEmbedding
+  (K : Kernel α β) (τ : β ≃ᵐ γ) : Kernel α γ := K.map τ
 
-def compProd
-  [p : ProdLikeM F α β]
-  [q : ProdLikeM F' β γ]
+def Kernel.compProd'
   (K : Kernel α β)
+  (p : ProdLikeM F α β)
   (L : Kernel p γ)
+  (q : ProdLikeM F' β γ)
   : Kernel α q :=
   change_right (K ⊗ₖ (change_left L p.equiv)) q.equiv.symm
 
 
 
-infixl:100 (priority := high) " ⊗ₖ " => compProd
+-- infixl:100 " ⊗ₖ' " => Kernel.compProd'
+-- infixl:100 " ⊗ₖ'[" p "]" => Kernel.compProd' p
 
 
 #check Measure.compProd
-def measureCompProd (μ : Measure α) (K : Kernel α β) [p: ProdLikeM γ α β]
-  : MeasureTheory.Measure γ := (μ.compProd K).comap p.equiv
+def compProd' (μ : Measure α) (K : Kernel α β) (p: ProdLikeM γ α β)
+  : MeasureTheory.Measure γ := (μ.compProd K).map p.equiv.symm
 
-@[simp]
-theorem compProd_is_Kernel_compProd (K : Kernel α β) (L : Kernel (α × β) γ)
-: K ⊗ₖ L = Kernel.compProd K L := by {
-  unfold compProd change_right change_left
-  simp
-  exact rfl
-}
+-- infixl:100 (priority := high) " ⊗ₘ' " => Measure.compProd'
+
+lemma compProd'_def (μ : Measure α) (K : Kernel α β) (p: ProdLikeM γ α β)
+  : compProd' μ K p = (μ.compProd K).map p.equiv.symm := rfl
+
+lemma compProd'_apply (μ : Measure α) (K : Kernel α β) [p: ProdLikeM γ α β]
+  (s : Set (α × β)) (hs : MeasurableSet s)
+  : compProd' μ K p (p.equiv ⁻¹' s) = (μ ⊗ₘ K) s := by {
+    rw [compProd'_def]
+    rw [Measure.map_apply]
+    simp
+    exact MeasurableEquiv.measurable ProdLikeM.equiv.symm
+    apply MeasurableSet.preimage hs (MeasurableEquiv.measurable p.equiv)
+  }
+
+-- @[simp]
+-- theorem compProd'_is_Kernel_compProd (K : Kernel α β) (L : Kernel (α × β) γ)
+-- : compProd' K ⊗ₖ' L = K ⊗ₖ L := by {
+--   rw [show K ⊗ₖ' L = change_right (K ⊗ₖ change_left L ProdLikeM.equiv) ProdLikeM.equiv.symm from rfl]
+--   unfold change_right change_left
+--   generalize_proofs ms1 ms2
+--   rw [show L.comap ProdLikeM.equiv.invFun ms1 = L by {
+--     exact rfl
+--   }]
+--   rw [show ⇑ProdLikeM.equiv.symm = id by {
+--     rfl
+--   }]
+--   exact Kernel.map_id (K ⊗ₖ L)
+-- }
 
 
 
