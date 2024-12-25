@@ -229,6 +229,15 @@ class EquivalentMeasurableSpace (α : Type*) (β : Type*)
 def convert_measure [MeasurableSpace α] [MeasurableSpace β]
   [e : EquivalentMeasurableSpace α β] (μ : Measure α) := μ.map e.equiv
 
+instance isProb_convert [MeasurableSpace α] [MeasurableSpace β]
+  (μ : Measure α)
+  [EquivalentMeasurableSpace α β] [IsProbabilityMeasure μ]
+    : IsProbabilityMeasure (convert_measure μ : Measure β)  := by {
+      unfold convert_measure
+      apply isProbabilityMeasure_map
+      measurability
+}
+
 -- def test : DFunLike.coe
 
 -- instance
@@ -265,6 +274,43 @@ def FiniteCompMeasureKernelNat
   : (n : ℕ) -> Measure (∀k : {k|k <= n}, α k)
   | 0 => convert_measure μ
   | m + 1 => compProd' (FiniteCompMeasureKernelNat μ K m) (K m)
+
+
+instance compProd'_stays_probability
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  [MeasurableSpace γ]
+  [p : ProdLikeM γ α β]
+  (μ : Measure α)
+  [IsProbabilityMeasure μ]
+  (K : Kernel α β)
+  [IsMarkovKernel K]
+  : IsProbabilityMeasure (compProd' μ K : Measure γ) := by {
+    rw [compProd'_def]
+    apply isProbabilityMeasure_map
+    measurability
+  }
+
+
+
+instance finite_comp_stays_probability
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  (μ : Measure (α 0))
+  [hμ : IsProbabilityMeasure μ]
+  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  (mK : ∀m, IsMarkovKernel (K m))
+  (n : ℕ) : IsProbabilityMeasure (FiniteCompMeasureKernelNat μ K n) := by {
+    induction n with
+    | zero =>  {
+      unfold FiniteCompMeasureKernelNat
+      infer_instance
+    }
+    | succ n => {
+      unfold FiniteCompMeasureKernelNat
+      infer_instance
+    }
+  }
 
 
 -- def FiniteCompMeasureKernelNat
@@ -384,7 +430,7 @@ lemma compProd'_fst_is_measure [mα : MeasurableSpace α] [mβ : MeasurableSpace
 lemma comp_preimage (f : α -> β) (g : γ -> α) : g ⁻¹' (f ⁻¹' t) = (f ∘ g) ⁻¹' t := rfl
 
 lemma restrict_prod_fst
-  {α : ℕ -> Type*}
+  (α : ℕ -> Type*)
   [∀m, MeasurableSpace (α m)]
   [∀m, Inhabited (α m)]
   (n: ℕ)
@@ -439,28 +485,27 @@ lemma KernelLift
         unfold FiniteCompMeasureKernelNat
         simp only [coe_setOf, mem_setOf_eq, AddLeftCancelMonoid.add_eq_zero, one_ne_zero, and_false,
           ↓reduceDIte, Nat.add_one_sub_one, eq_mpr_eq_cast]
-        by_cases hm0 : m = 0
-        ·
-        -- -- · simp only [hm0, ↓reduceDIte]
-        --   have hm1 : m+1 = 1 := by exact Nat.add_left_eq_self.mpr hm0
-
-          -- have ph : Fact (m + 1 ∉ {k | k ≤ m}) := ⟨by simp⟩
-          -- let p : ProdLikeM ((k : ↑({k | k ≤ m} ∪ {m + 1})) → α ↑k)
-          --   ((k : { x // x ≤ m }) → α ↑k) (α (m + 1))
-          --   := @inferInstance (ProdLikeM ((k : ↑({k | k ≤ m} ∪ {m + 1})) → α ↑k)
-          --     ((k : { x // x ≤ m }) → α ↑k) (α (m + 1)))
-          --           (instProdLikeMForallValMemSetUnionSingletonForall α (m + 1))
-
-          subst hm0
-          simp at *
-
-          -- simp only [Nat.reduceAdd, ↓reduceDIte]
-          -- let p : ProdLikeM ((k : { x // x ≤ 0 + 1 }) → α ↑k) ((k : { x // x ≤ 0 }) → α ↑k) (α (0 + 1))
-          --   := by infer_instance
+        match m with
+        | 0 => {
+          simp
           rw [compProd'_def]
+          rw [Measure.map_apply]
+          {
+          rw [comp_preimage]
+          have hh := restrict_prod_fst α 0
+          simp at hh
+          rw [hh]
+          rw [<- Measure.map_apply]
+          -- rw [compProd'_fst_is_measure μ K]
+
+          have hhh := compProd'_fst_is_measure (FiniteCompMeasureKernelNat μ K 0) (K 0)
+          -- (γ := ((k : { x // x ≤ 1 }) → α ↑k))
+
+          }
+        }
+        | k + 1 => {
           -- unfold FiniteCompMeasureKernelNat
           -- simp
-          rw [Measure.map_apply]
           · rw [comp_preimage]
             simp
             rw [show p.equiv.symm ⁻¹' (restrict₂ hresm ⁻¹' s)
