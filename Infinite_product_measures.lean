@@ -17,36 +17,36 @@ noncomputable section
 namespace ProductProbabilityMeasure
 open MeasureTheory MeasurableSpace Measurable ProductLike
 
-variable {I : Type*}
-variable (Ω : ∀(i : I), Type*)
-variable [∀i, MeasurableSpace (Ω i)]
-variable (J : Set I)
-variable (JF : Finset I)
+-- variable {I : Type*}
+-- variable (Ω : ∀(i : I), Type*)
+-- variable [∀i, MeasurableSpace (Ω i)]
+-- variable (J : Set I)
+-- variable (JF : Finset I)
 
-instance : (i : JF) -> MeasurableSpace (JF.restrict Ω i) := by {
-  intro i
-  rw [show JF.restrict Ω i = Ω i by rfl]
-  infer_instance
-}
-instance : ∀(i : J), MeasurableSpace (J.restrict Ω i) := by {
-  intro i
-  rw [show J.restrict Ω i = Ω i by rfl]
-  infer_instance
-}
--- ×_(i ∈ I) Ω_i
-abbrev ProductSpace := (i: I) -> Ω i
+-- instance : (i : JF) -> MeasurableSpace (JF.restrict Ω i) := by {
+--   intro i
+--   rw [show JF.restrict Ω i = Ω i by rfl]
+--   infer_instance
+-- }
+-- instance : ∀(i : J), MeasurableSpace (J.restrict Ω i) := by {
+--   intro i
+--   rw [show J.restrict Ω i = Ω i by rfl]
+--   infer_instance
+-- }
+-- -- ×_(i ∈ I) Ω_i
+-- abbrev ProductSpace := (i: I) -> Ω i
 
 
--- def π (i : I) (ω : ProductSpace Ω) := ω i
-def π (J : Set I) : ProductSpace Ω  -> ProductSpace (J.restrict Ω) :=
-  fun ω => J.restrict ω
+-- -- def π (i : I) (ω : ProductSpace Ω) := ω i
+-- def π (J : Set I) : ProductSpace Ω  -> ProductSpace (J.restrict Ω) :=
+--   fun ω => J.restrict ω
 
--- variable (i : I)
--- #check π Ω {i}
+-- -- variable (i : I)
+-- -- #check π Ω {i}
 
-lemma pi_measurable (J : Set I) : Measurable (π Ω J) := by {
-    exact measurable_restrict J
-}
+-- lemma pi_measurable (J : Set I) : Measurable (π Ω J) := by {
+--     exact measurable_restrict J
+-- }
 
 -- Ionescu-Tulcea
 open ProbabilityMeasure Measure ProductLike
@@ -146,34 +146,160 @@ def MeasurableEquiv.piUnique' [αU : Unique α] (β : α → Type*) [∀a, Measu
     exact measurable_uniqueElim' β a
   }
 
+lemma not_le_n_is_n_add_one {n : ℕ} {i : {k | k <= n+1}} (h : ¬i <= n) : i = ⟨n+1, by simp⟩  := by {
+  rw [Nat.not_le_eq] at h
+  apply_fun (·.1)
+  exact Nat.le_antisymm i.2 h
+  exact Subtype.val_injective
+}
+
+def equiv {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
+  :(∀k : {k| k <= n + 1}, α k) ≃ᵐ (∀k : {k | k <= n}, α k) × (α (n+1)) where
+  toFun x := ⟨fun i : {k | k <= n} =>
+    x ⟨↑i, by obtain ⟨x,hx⟩ := i; simp at hx; simp; omega ⟩,
+    x ⟨n+1, by simp⟩⟩
+  invFun := fun (x, y) => fun i => if hi : i <= n then x ⟨↑i, hi⟩ else
+    have h : α (n+1) = α ↑i := by rw [not_le_n_is_n_add_one hi]
+    have h' : HEq (mα (n+1)) (mα ↑i) := by rw [not_le_n_is_n_add_one hi]
+    MeasurableEquiv.cast h h' y
+  left_inv := by {
+    simp
+    intro x
+    ext i
+    by_cases hi : i <= n <;> simp [hi]
+    have h := not_le_n_is_n_add_one hi
+    subst h
+    rfl
+  }
+  right_inv := by {
+    intro x
+    ext i
+    · simp [show ↑i <= n from i.2]; rfl
+    · simp; rfl
+  }
+  measurable_toFun := by {
+    -- measurability
+    simp_all only [coe_setOf, mem_setOf_eq, Int.reduceNeg, id_eq, Int.Nat.cast_ofNat_Int, eq_mpr_eq_cast,
+      Equiv.coe_fn_mk]
+    apply Measurable.prod
+    · simp_all only [Int.reduceNeg]
+      apply measurable_pi_lambda
+      intro a
+      simp_all only [Int.reduceNeg]
+      obtain ⟨val, property⟩ := a
+      simp_all only [Int.reduceNeg]
+      apply measurable_pi_apply
+    · simp_all only
+      apply measurable_pi_apply
+  }
+  measurable_invFun := by {
+    simp
+    apply measurable_pi_lambda
+    intro a
+    by_cases ha : a <= n <;> simp [ha]
+    · -- measurability
+      obtain ⟨val, property⟩ := a
+      simp_all only
+      apply Measurable.eval
+      simp_all only
+      apply measurable_fst
+    · -- measurability
+      obtain ⟨val, property⟩ := a
+      simp_all only
+      apply Measurable.comp'
+      · apply MeasurableEquiv.measurable
+      · simp_all only [not_le]
+        apply measurable_snd
+  }
+
+instance {α : ℕ -> Type*} [∀n, MeasurableSpace (α n)] (n : ℕ)
+  : ProdLikeM (∀k : {k| k <= n + 1}, α k) (∀k : {k | k <= n}, α k) (α (n+1)) where
+  equiv := equiv n
+-- instance {α : ℕ -> Type*} [∀n, MeasurableSpace (α n)] (n : ℕ)
+--   : ProdLikeM (∀k : {k| k <= n}, α k) (∀k : {k | k <= n-1}, α k) (α (n- 1 + 1)) := by {
+--       rw [show {k| k <= n} = {k | k <= n -1} ∪ {n -1 + 1} by ext; simp; omega]
+--       have h : Fact (n -1 + 1 ∉ {k | k <= n-1}) := ⟨by simp⟩
+--       -- exact instProdLikeMForallValMemSetUnionSingletonForall α (n₀ + 1)
+--       infer_instance
+--     }
+class EquivalentMeasurableSpace (α : Type*) (β : Type*)
+  [MeasurableSpace α] [MeasurableSpace β] where
+  equiv : α ≃ᵐ β
+
+def convert_measure [MeasurableSpace α] [MeasurableSpace β]
+  [e : EquivalentMeasurableSpace α β] (μ : Measure α) := μ.map e.equiv
+
+-- def test : DFunLike.coe
+
+-- instance
+-- {α : Type*}
+-- {β : Type*}
+-- [(MeasurableSpace α)]
+-- [(MeasurableSpace β)]
+-- -- [EquivalentMeasurableSpace α β]
+--  : Coe (Measure α) ((Measure β))  where
+--   coe m := sorry
+
+instance {α : ℕ -> Type*} [∀m, MeasurableSpace (α m)]
+  : EquivalentMeasurableSpace (∀k : {k | k <= 0}, α k) (α 0) where
+  equiv :=
+      let U : Unique {k | k <= 0} := by {
+          simp; infer_instance
+        -- rw [show {k | k <= n} = {0} by ext; simp]
+        -- exact uniqueSingleton 0
+      }
+      let τ := MeasurableEquiv.piUnique'
+        (α := ({k | k <= 0})) (β := fun x => α ↑x) ⟨0, by simp⟩
+      τ
+instance [MeasurableSpace α] [MeasurableSpace β] [e : EquivalentMeasurableSpace α β]
+: EquivalentMeasurableSpace β α where
+  equiv := e.equiv.symm
+
+
+
 def FiniteCompMeasureKernelNat
-  (n : ℕ)
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
   (μ : Measure (α 0))
   (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
-  : Measure (∀k : {k|k <= n}, α k) :=
-  if hn : n = 0 then
-    let ms : α 0 ≃ᵐ ∀k : {k | k <= n}, α k :=
-      let U : Unique {k | k <= n} := by {
-        rw [show {k | k <= n} = {0} by ext; simp[hn]]
-        exact uniqueSingleton 0
-      }
-      let τ := MeasurableEquiv.piUnique'
-        (α := ({k | k <= n})) (β := fun x => α ↑x) ⟨0, by simp⟩
-      τ.symm
-    μ.map ms
-  else
-    let n₀ := n - 1
-    let p : ProdLikeM (∀k : {k| k <= n}, α k) (∀k : {k | k <= n₀}, α k) (α (n₀ + 1)) := by {
-      rw [show {k| k <= n} = {k | k <= n₀} ∪ {n₀ + 1} by ext; simp; omega]
-      have h : Fact (n₀ + 1 ∉ {k | k <= n₀}) := ⟨by simp⟩
-      -- exact instProdLikeMForallValMemSetUnionSingletonForall α (n₀ + 1)
-      infer_instance
-    }
-   compProd' (FiniteCompMeasureKernelNat n₀ μ K) (K n₀) p
+  : (n : ℕ) -> Measure (∀k : {k|k <= n}, α k)
+  | 0 => convert_measure μ
+  | m + 1 => compProd' (FiniteCompMeasureKernelNat μ K m) (K m)
 
--- #check squareCylinders
+
+-- def FiniteCompMeasureKernelNat
+--   (n : ℕ)
+--   {α : ℕ -> Type*}
+--   [∀m, MeasurableSpace (α m)]
+--   (μ : Measure (α 0))
+--   (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+--   : Measure (∀k : {k|k <= n}, α k) :=
+--   match n with
+--   | 0 => (
+--   -- if hn : n = 0 then
+--     let ms : α 0 ≃ᵐ ∀k : {k | k <= n}, α k :=
+--       let U : Unique {k | k <= n} := by {
+--         sorry
+--         -- rw [show {k | k <= n} = {0} by ext; simp]
+--         -- exact uniqueSingleton 0
+--       }
+--       let τ := MeasurableEquiv.piUnique'
+--         (α := ({k | k <= n})) (β := fun x => α ↑x) ⟨0, by simp⟩
+--       τ.symm
+--     μ.map ms
+--   )
+--   -- else
+--   | Nat.succ m => sorry
+--     -- let n₀ := n - 1
+--     -- let p : ProdLikeM (∀k : {k| k <= n}, α k) (∀k : {k | k <= n₀}, α k) (α (n₀ + 1)) := by {
+--     --   rw [show {k| k <= n} = {k | k <= n₀} ∪ {n₀ + 1} by ext; simp; omega]
+--     --   have h : Fact (n₀ + 1 ∉ {k | k <= n₀}) := ⟨by simp⟩
+--     --   -- exact instProdLikeMForallValMemSetUnionSingletonForall α (n₀ + 1)
+--     --   infer_instance
+--     -- }
+--   --  compProd' (FiniteCompMeasureKernelNat n₀ μ K) (K n₀)
+
+-- -- #check squareCylinders
 
 -- #check {1,n} : Set ℕ
 
@@ -230,7 +356,8 @@ lemma compProd'_fst_is_measure [mα : MeasurableSpace α] [mβ : MeasurableSpace
 [IsProbabilityMeasure μ] (K : Kernel α β) [MeasurableSpace γ]
 [p : ProdLikeM γ α β]
   [mK : IsMarkovKernel K]
-  : (compProd' μ K (p := p)).map (Prod.fst ∘ p.equiv) = μ := by {
+  : (compProd' μ K (p := p)).map p.fst = μ := by {
+    rw [show p.fst = (Prod.fst ∘ p.equiv) by rfl]
     ext s hs
     have hf : Measurable (Prod.fst ∘ p.equiv) := by {
       apply Measurable.comp
@@ -253,6 +380,26 @@ lemma compProd'_fst_is_measure [mα : MeasurableSpace α] [mβ : MeasurableSpace
     exact ht
   }
 
+
+lemma comp_preimage (f : α -> β) (g : γ -> α) : g ⁻¹' (f ⁻¹' t) = (f ∘ g) ⁻¹' t := rfl
+
+lemma restrict_prod_fst
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]
+  (n: ℕ)
+  : restrict₂ (π := α) (le_to_subset <| Nat.le_add_right n 1) ∘ ⇑ProdLikeM.equiv.symm
+    = Prod.fst
+    := by {
+      ext x y
+      simp
+      unfold ProdLikeM.equiv
+      unfold instProdLikeMForallValNatMemSetSetOfLeHAddOfNatForall
+      unfold equiv
+      simp [show ↑y<= n from y.2]
+      rfl
+    }
+
 lemma KernelLift
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
@@ -263,8 +410,8 @@ lemma KernelLift
   (mK : ∀m, IsMarkovKernel (K m))
   {n m: ℕ}
   (hnm : n <= m)
-  : (FiniteCompMeasureKernelNat m μ K).map ({k | k <= n}.restrict₂ (le_to_subset hnm))
-  = (FiniteCompMeasureKernelNat n μ K)
+  : (FiniteCompMeasureKernelNat μ K m).map ({k | k <= n}.restrict₂ (le_to_subset hnm))
+  = (FiniteCompMeasureKernelNat μ K n)
   := by {
   ext s hs
   revert n
@@ -280,12 +427,12 @@ lemma KernelLift
   | succ m hm => {
     intro n hnm
     generalize_proofs hres
-    have h : m <= m+ 1 := by exact Nat.le_add_right m 1
+    have h : m <= m + 1 := by exact Nat.le_add_right m 1
 
     have hresm := le_to_subset (Nat.le_add_right m 1)
     have heqm : ∀ (s : Set ((a : ↑{k | k ≤ m}) → α ↑a)), MeasurableSet s →
-    (Measure.map (restrict₂ hresm) (FiniteCompMeasureKernelNat (m + 1) μ K)) s
-      = (FiniteCompMeasureKernelNat m μ K) s := by {
+    (Measure.map (restrict₂ hresm) (FiniteCompMeasureKernelNat μ K (m + 1))) s
+      = (FiniteCompMeasureKernelNat μ K m) s := by {
         intro s hs
         have restrms : Measurable (restrict₂ (π := α) hresm) := measurable_restrict₂ hresm
         rw [Measure.map_apply restrms hs]
@@ -296,24 +443,29 @@ lemma KernelLift
         ·
         -- -- · simp only [hm0, ↓reduceDIte]
         --   have hm1 : m+1 = 1 := by exact Nat.add_left_eq_self.mpr hm0
-          have ph : Fact (m + 1 ∉ {k | k ≤ m}) := ⟨by simp⟩
-          let p : ProdLikeM ((k : ↑({k | k ≤ m} ∪ {m + 1})) → α ↑k)
-            ((k : { x // x ≤ m }) → α ↑k) (α (m + 1))
-            := @inferInstance (ProdLikeM ((k : ↑({k | k ≤ m} ∪ {m + 1})) → α ↑k)
-              ((k : { x // x ≤ m }) → α ↑k) (α (m + 1)))
-                    (instProdLikeMForallValMemSetUnionSingletonForall α (m + 1))
+
+          -- have ph : Fact (m + 1 ∉ {k | k ≤ m}) := ⟨by simp⟩
+          -- let p : ProdLikeM ((k : ↑({k | k ≤ m} ∪ {m + 1})) → α ↑k)
+          --   ((k : { x // x ≤ m }) → α ↑k) (α (m + 1))
+          --   := @inferInstance (ProdLikeM ((k : ↑({k | k ≤ m} ∪ {m + 1})) → α ↑k)
+          --     ((k : { x // x ≤ m }) → α ↑k) (α (m + 1)))
+          --           (instProdLikeMForallValMemSetUnionSingletonForall α (m + 1))
 
           subst hm0
-          simp only [Nat.reduceAdd, ↓reduceDIte]
+          simp at *
+
+          -- simp only [Nat.reduceAdd, ↓reduceDIte]
           -- let p : ProdLikeM ((k : { x // x ≤ 0 + 1 }) → α ↑k) ((k : { x // x ≤ 0 }) → α ↑k) (α (0 + 1))
           --   := by infer_instance
           rw [compProd'_def]
-          rw [Measure.map_apply, Measure.map_apply]
-          ·
+          -- unfold FiniteCompMeasureKernelNat
+          -- simp
+          rw [Measure.map_apply]
+          · rw [comp_preimage]
+            simp
             rw [show p.equiv.symm ⁻¹' (restrict₂ hresm ⁻¹' s)
               = (restrict₂ hresm ∘ p.equiv.symm) ⁻¹' s by {sorry}]
           -- have h : restrict₂ hresm = Prod.fst ∘ ((⇑ProdLikeM.equiv.symm) : ((k : { x // x ≤ 0 }) → α ↑k) × α 1 → (k : { x // x ≤ 1 }) → α ↑k) := by {
-
           }
           -- generalize_proofs p1 F1 hms hclear
 

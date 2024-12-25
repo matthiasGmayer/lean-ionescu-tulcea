@@ -65,17 +65,17 @@ def Kernel.compProd'
 
 
 #check Measure.compProd
-def compProd' (μ : Measure α) (K : Kernel α β) (p: ProdLikeM γ α β)
+def compProd' (μ : Measure α) (K : Kernel α β) [p: ProdLikeM γ α β]
   : MeasureTheory.Measure γ := (μ.compProd K).map p.equiv.symm
 
 -- infixl:100 (priority := high) " ⊗ₘ' " => Measure.compProd'
 
 lemma compProd'_def (μ : Measure α) (K : Kernel α β) (p: ProdLikeM γ α β)
-  : compProd' μ K p = (μ.compProd K).map p.equiv.symm := rfl
+  : compProd' μ K (p := p) = (μ.compProd K).map p.equiv.symm := rfl
 
 lemma compProd'_apply (μ : Measure α) (K : Kernel α β) [p: ProdLikeM γ α β]
   (s : Set (α × β)) (hs : MeasurableSet s)
-  : compProd' μ K p (p.equiv ⁻¹' s) = (μ ⊗ₘ K) s := by {
+  : compProd' μ K (p := p) (p.equiv ⁻¹' s) = (μ ⊗ₘ K) s := by {
     rw [compProd'_def]
     rw [Measure.map_apply]
     simp
