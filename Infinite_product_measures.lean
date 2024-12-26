@@ -299,7 +299,7 @@ instance finite_comp_stays_probability
   (μ : Measure (α 0))
   [hμ : IsProbabilityMeasure μ]
   (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
-  (mK : ∀m, IsMarkovKernel (K m))
+  [mK : ∀m, IsMarkovKernel (K m)]
   (n : ℕ) : IsProbabilityMeasure (FiniteCompMeasureKernelNat μ K n) := by {
     induction n with
     | zero =>  {
@@ -429,7 +429,7 @@ lemma compProd'_fst_is_measure [mα : MeasurableSpace α] [mβ : MeasurableSpace
 
 lemma comp_preimage (f : α -> β) (g : γ -> α) : g ⁻¹' (f ⁻¹' t) = (f ∘ g) ⁻¹' t := rfl
 
-lemma restrict_prod_fst
+lemma restrict_equiv_prod_fst
   (α : ℕ -> Type*)
   [∀m, MeasurableSpace (α m)]
   [∀m, Inhabited (α m)]
@@ -445,6 +445,14 @@ lemma restrict_prod_fst
       simp [show ↑y<= n from y.2]
       rfl
     }
+lemma restrict_prod_fst
+  (α : ℕ -> Type*)
+  [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]
+  (n: ℕ)
+  : restrict₂ (π := α) (le_to_subset <| Nat.le_add_right n 1)
+    = ProdLikeM.fst
+    := by rfl
 
 lemma KernelLift
   {α : ℕ -> Type*}
@@ -464,79 +472,54 @@ lemma KernelLift
   induction m with
   | zero => {
     intro n hnm
-    rw [@Nat.le_zero] at hnm
+    rw [Nat.le_zero] at hnm
     subst hnm
-    generalize_proofs h
     unfold restrict₂
     simp
     }
   | succ m hm => {
     intro n hnm
-    generalize_proofs hres
-    have h : m <= m + 1 := by exact Nat.le_add_right m 1
-
     have hresm := le_to_subset (Nat.le_add_right m 1)
     have heqm : ∀ (s : Set ((a : ↑{k | k ≤ m}) → α ↑a)), MeasurableSet s →
     (Measure.map (restrict₂ hresm) (FiniteCompMeasureKernelNat μ K (m + 1))) s
       = (FiniteCompMeasureKernelNat μ K m) s := by {
         intro s hs
-        have restrms : Measurable (restrict₂ (π := α) hresm) := measurable_restrict₂ hresm
-        rw [Measure.map_apply restrms hs]
+        rw [restrict_prod_fst]
         unfold FiniteCompMeasureKernelNat
-        simp only [coe_setOf, mem_setOf_eq, AddLeftCancelMonoid.add_eq_zero, one_ne_zero, and_false,
-          ↓reduceDIte, Nat.add_one_sub_one, eq_mpr_eq_cast]
+        rw [compProd'_fst_is_measure]
         match m with
         | 0 => {
-          simp
-          rw [compProd'_def]
-          rw [Measure.map_apply]
-          {
-          rw [comp_preimage]
-          have hh := restrict_prod_fst α 0
-          simp at hh
-          rw [hh]
-          rw [<- Measure.map_apply]
-          -- rw [compProd'_fst_is_measure μ K]
-
-          have hhh := compProd'_fst_is_measure (FiniteCompMeasureKernelNat μ K 0) (K 0)
-          -- (γ := ((k : { x // x ≤ 1 }) → α ↑k))
-
-          }
+          simp only [Nat.reduceAdd]
+          rfl
         }
-        | k + 1 => {
-          -- unfold FiniteCompMeasureKernelNat
-          -- simp
-          · rw [comp_preimage]
-            simp
-            rw [show p.equiv.symm ⁻¹' (restrict₂ hresm ⁻¹' s)
-              = (restrict₂ hresm ∘ p.equiv.symm) ⁻¹' s by {sorry}]
-          -- have h : restrict₂ hresm = Prod.fst ∘ ((⇑ProdLikeM.equiv.symm) : ((k : { x // x ≤ 0 }) → α ↑k) × α 1 → (k : { x // x ≤ 1 }) → α ↑k) := by {
-          }
-          -- generalize_proofs p1 F1 hms hclear
-
-          -- rw [Measure.map_apply]
-          -- unfold restrict₂
-
-          -- have h : (restrict₂ hresm ⁻¹' s) = p1.equiv '' s
-          -- nth_rw 3 [DFunLike.coe]
-
-
-          -- rw [show ⇑(MeasurableEquiv.piUnique' (fun k : {k | k <= 0} ↦ α ↑k) ⟨0, hclear⟩).symm =
-          --     (MeasurableEquiv.piUnique' (fun k ↦ α ↑k) ⟨0, hclear⟩).invFun from rfl]
-
-          -- rw [show (MeasurableEquiv.piUnique' (fun k : {k | k <= 0} ↦ α ↑k) (⟨0, hclear⟩ : {k | k <= 0})).symm
-          --     = uniqueElim' (fun k ↦ α ↑k) (⟨0, hclear⟩ : {k | k <= 0}) from rfl]
-
-
+        | m + 1 => {
+          simp only [Nat.reduceAdd]
+          rfl
+        }
       }
-
-    rw [@Nat.le_add_one_iff] at hnm
-    -- obtain hnm|hnm := hnm
-
-    -- ·
-      -- exact hm hnm
-    -- have heq :
-
+    intro s hs
+    generalize_proofs hres
+    by_cases h0 : n = m + 1
+    · subst h0
+      rw [show restrict₂ hres = id by rfl]
+      simp
+    by_cases h1 : n = m
+    · subst h1
+      exact heqm s hs
+    have h : n <= m := by omega
+    have hresn := le_to_subset h
+    rw [Measure.map_apply (measurable_restrict₂ hres) hs]
+    rw [show restrict₂ hres = restrict₂ hresn ∘ (restrict₂ hresm) from rfl]
+    let t := restrict₂ hresn ⁻¹' s
+    have ht : MeasurableSet t := MeasurableSet.preimage hs (measurable_restrict₂ _)
+    rw [<- comp_preimage]
+    rw [show restrict₂ hresn ⁻¹'s = t from rfl]
+    rw [<- Measure.map_apply (measurable_restrict₂ hresm) ht]
+    specialize heqm t ht
+    rw [heqm]
+    unfold t
+    rw [<- Measure.map_apply (measurable_restrict₂ hresn) hs]
+    exact hm h s hs
     }
 }
 

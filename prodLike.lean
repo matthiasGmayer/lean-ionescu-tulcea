@@ -40,8 +40,8 @@ def ProdLikeM.symm (p : ProdLikeM F α β) : ProdLikeM F β α := ⟨trans p.equ
 def ProdLikeM.fst_type (P : ProdLikeM F α β) := α
 def ProdLikeM.snd_type (P : ProdLikeM F α β) := β
 
-def ProdLikeM.fst (P : ProdLikeM F α β) (x : P) : α := (P.equiv x).fst
-def ProdLikeM.snd (P : ProdLikeM F α β) (x : P) : β := (P.equiv x).snd
+def ProdLikeM.fst [P : ProdLikeM F α β] (x : P) : α := (P.equiv x).fst
+def ProdLikeM.snd [P : ProdLikeM F α β] (x : P) : β := (P.equiv x).snd
 
 
 def change_left [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
