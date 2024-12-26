@@ -152,7 +152,6 @@ lemma not_le_n_is_n_add_one {n : ℕ} {i : {k | k <= n+1}} (h : ¬i <= n) : i = 
   exact Nat.le_antisymm i.2 h
   exact Subtype.val_injective
 }
-
 def equiv {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
   :(∀k : {k| k <= n + 1}, α k) ≃ᵐ (∀k : {k | k <= n}, α k) × (α (n+1)) where
   toFun x := ⟨fun i : {k | k <= n} =>
@@ -270,7 +269,8 @@ def FiniteCompMeasureKernelNat
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
   (μ : Measure (α 0))
-  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
+  -- (K : ∀m, Kernel (∀k ≤ m, α k) (α (m+1)))
   : (n : ℕ) -> Measure (∀k : {k|k <= n}, α k)
   | 0 => convert_measure μ
   | m + 1 => compProd' (FiniteCompMeasureKernelNat μ K m) (K m)
@@ -432,7 +432,7 @@ lemma comp_preimage (f : α -> β) (g : γ -> α) : g ⁻¹' (f ⁻¹' t) = (f �
 lemma restrict_equiv_prod_fst
   (α : ℕ -> Type*)
   [∀m, MeasurableSpace (α m)]
-  [∀m, Inhabited (α m)]
+  -- [∀m, Inhabited (α m)]
   (n: ℕ)
   : restrict₂ (π := α) (le_to_subset <| Nat.le_add_right n 1) ∘ ⇑ProdLikeM.equiv.symm
     = Prod.fst
@@ -448,7 +448,7 @@ lemma restrict_equiv_prod_fst
 lemma restrict_prod_fst
   (α : ℕ -> Type*)
   [∀m, MeasurableSpace (α m)]
-  [∀m, Inhabited (α m)]
+  -- [∀m, Inhabited (α m)]
   (n: ℕ)
   : restrict₂ (π := α) (le_to_subset <| Nat.le_add_right n 1)
     = ProdLikeM.fst
@@ -457,11 +457,11 @@ lemma restrict_prod_fst
 lemma KernelLift
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
-  [∀m, Inhabited (α m)]
+  -- [∀m, Inhabited (α m)]
   (μ : Measure (α 0))
   [hμ : IsProbabilityMeasure μ ]
   (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
-  (mK : ∀m, IsMarkovKernel (K m))
+  [mK : ∀m, IsMarkovKernel (K m)]
   {n m: ℕ}
   (hnm : n <= m)
   : (FiniteCompMeasureKernelNat μ K m).map ({k | k <= n}.restrict₂ (le_to_subset hnm))
@@ -570,16 +570,49 @@ lemma Surj_emp (f : α -> β) (hf : Surjective f) (hS : f ⁻¹' S = ∅) : S = 
   exact (preimage_eq_preimage hf).mp (id (Eq.symm hS)).symm
 }
 
+lemma Surj_disjoint (f : α -> β) (hf : Surjective f) (hab : Disjoint (f ⁻¹' a) (f ⁻¹' b))
+  : Disjoint a b := by {
+    exact Disjoint.of_preimage hf hab
+  }
 
--- lemma test (S : Finset α) (f : α -> ℝ) : ∑ s ∈ S, f s = ∑ s : S, f s.1 := by {
---   exact Eq.symm (Finset.sum_coe_sort S f)
--- }
+lemma restrict_union (α : I -> Type*)
+[∀i, Inhabited (α i)]
+{J : Set I}
+{s t r : Set (∀j : J, α j)}
+  (h : (J.restrict ⁻¹' s) ∪ (J.restrict ⁻¹' t) = (J.restrict ⁻¹' r))
+  : s ∪ t = r
+   := by {
+    ext x
+    have hh := Subtype.exists_pi_extension x
+    have hy := choose_spec hh
+    let y := choose hh
+    rw [show choose hh = y from rfl] at *
+    have h' : J.restrict y = x := by {
+      ext i
+      simp
+      apply_fun (· i) at hy
+      simp at hy
+      assumption
+    }
+    have hxy s : x ∈ s <-> y ∈ J.restrict ⁻¹' s := by simp [h']
+    rw [hxy, hxy, <- h]
+    simp
+  }
+
+lemma restrict_surjective (α : I -> Type*) [∀i, Nonempty (α i)] {J : Set I} : Surjective (J.restrict (π := α)) := by {
+  -- unfold Surjective
+  intro b
+  exact Subtype.exists_pi_extension b
+}
+
 def MeasureKernelSequenceContent
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
   [∀m, Inhabited (α m)]
   (μ : Measure (α 0))
+  [hμ : IsProbabilityMeasure μ]
   (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  [hK : ∀n, IsMarkovKernel (K n)]
   : AddContent (cylinders α) := AddContent.mk'
     (C := cylinders α)
     (hAlg := cylinders_SetAlgebra α)
@@ -588,7 +621,7 @@ def MeasureKernelSequenceContent
         have h' := Nat.find_spec h
         let n := Nat.find h
         let T := choose h'
-        FiniteCompMeasureKernelNat n μ K T
+        FiniteCompMeasureKernelNat μ K n T
       else 0)
     (empty' := by {
       simp
@@ -596,76 +629,74 @@ def MeasureKernelSequenceContent
       generalize_proofs h1 h2
       have ⟨_,h3⟩ := choose_spec h2
       have h' : choose h2 = ∅ := by {
-        have g : Surjective ({x | x <= Nat.find h1}.restrict (π := α)) := by {
-          unfold Surjective
-          intro b
-          exact Subtype.exists_pi_extension b
-        }
-        exact Surj_emp {x | x ≤ Nat.find h1}.restrict g h3
+        exact Surj_emp {x | x ≤ Nat.find h1}.restrict (restrict_surjective _) h3
       }
       rw [h']
-      simp
+      simp only [measure_empty]
     })
     (additivity := by {
       intro s hs t ht hst
       have hsut : s ∪ t ∈ cylinders α := by apply (cylinders_SetAlgebra α).union_mem hs ht
       unfold cylinders at hs ht hsut
-      simp at hs ht hsut
-      simp [hs, ht, hsut]
+      simp only [mem_iUnion] at hs ht hsut
+      simp only [hsut, ↓reduceDIte, coe_setOf, mem_setOf_eq, hs, ht]
+      generalize_proofs hTnm hTn hTm
 
+      let k := Nat.find hs ⊔ Nat.find ht ⊔ Nat.find hsut
+      have hnk : Nat.find hs <= k := by omega
+      have hmk : Nat.find ht <= k := by omega
+      have hnmk : Nat.find hsut <= k := by omega
+      rw [<- KernelLift μ K hnk, <- KernelLift μ K hmk, <- KernelLift μ K hnmk]
+      generalize_proofs gnm gn gm
+      simp only [coe_setOf, mem_setOf_eq]
+      repeat rw [Measure.map_apply]
+      {
+        let restrictk := {n|n<=k}.restrict (π := α)
+        have hrnm : restrict₂ gnm ∘ restrictk = {n | n <= Nat.find hsut}.restrict := by rfl
+        have hrn : restrict₂ gn ∘ restrictk = {n | n <= Nat.find hs}.restrict := by rfl
+        have hrm : restrict₂ gm ∘ restrictk = {n | n <= Nat.find ht}.restrict := by rfl
+        have hunion : restrict₂ gnm ⁻¹' choose hTnm =
+          restrict₂ gn ⁻¹' choose hTn ∪ restrict₂ gm ⁻¹' choose hTm := by {
+            symm
+            apply restrict_union α
+            repeat rw [comp_preimage]
+            rw [hrnm, hrn, hrm]
+            rw [(choose_spec hTnm).2, (choose_spec hTn).2, (choose_spec hTm).2]
+          }
+        have hdisjoint : Disjoint (restrict₂ gn ⁻¹' choose hTn) (restrict₂ gm ⁻¹' choose hTm)
+        := by {
+          apply Disjoint.of_preimage (restrict_surjective _)
+          repeat rw [comp_preimage]
+          rw[hrn, hrm]
+          rw [(choose_spec hTn).2, (choose_spec hTm).2]
+          assumption
+        }
+        rw [hunion]
+        apply measure_union hdisjoint
+        apply MeasurableSet.preimage
+        exact (choose_spec hTm).1
+        exact measurable_restrict₂ gm
+      }
+      exact measurable_restrict₂ gm
+      exact (choose_spec hTm).1
+      exact measurable_restrict₂ gn
+      exact (choose_spec hTn).1
+      exact measurable_restrict₂ gnm
+      exact (choose_spec hTnm).1
     })
 
-  --   sUnion' := by {
-  --     intro S hS pwd Urec
-  --     simp [Urec]
-  --     have h0 (s : S) : ∃ n, s.1 ∈ cylinder_n α n := by {
-  --       specialize hS s.2
-  --       exact mem_iUnion.mp hS
-  --     }
-  --     have h0' (s : S)  := Nat.find_spec (h0 s)
-  --     -- ∃ x_1, MeasurableSet x_1 ∧ {x_2 | x_2 ≤ Nat.find (h0 s hs)}.restrict ⁻¹' x_1 = s := by {
-  --     --   specialize h0 s hs
-  --     --   unfold cylinder_n at h0
-  --     -- }
-  --     have h' : ∃ n, ⋃₀ S ∈  cylinder_n α n := by exact mem_iUnion.mp Urec
-  --     simp [h']
 
-  --     generalize_proofs h1 h2 h3
-  --     have hhh
-  -- --     : (@Finset.sum (Set ((a : ℕ) → α a)) ℝ≥0∞ NonUnitalNonAssocSemiring.toAddCommMonoid S fun x ↦
-  -- -- if h : ∃ n, x ∈ cylinder_n α n then (FiniteCompMeasureKernelNat (Nat.find (h2 x h)) μ K) (choose (h3 x h)) else 0 : ℝ≥0∞)
-  -- --       =
-  -- --       ∑ s : S, (FiniteCompMeasureKernelNat (Nat.find (h0 s)) μ K) (choose (h0' s))
-  --       := by
-  --        calc
-  --       ∑ x ∈ S, (if h : ∃ n, x ∈ cylinder_n α n
-  --         then (FiniteCompMeasureKernelNat (Nat.find (h2 x h)) μ K) (choose (h3 x h)) else 0)
-  --       = ∑ s : S, (if h : ∃ n, s.1 ∈ cylinder_n α n
-  --         then (FiniteCompMeasureKernelNat (Nat.find (h2 s.1 h)) μ K) (choose (h3 s.1 h)) else 0)
-  --           := by symm; apply Finset.sum_coe_sort S (fun s => (if h : ∃ n, s ∈ cylinder_n α n
-  --                 then (FiniteCompMeasureKernelNat (Nat.find (h2 s h)) μ K) (choose (h3 s h)) else 0))
-  --       _ = ∑ s : S, (FiniteCompMeasureKernelNat (Nat.find (h0 s)) μ K) (choose (h0' s)) := by {
-  --         congr
-  --         ext s
-  --         simp [h0 s]
-  --     }
-  --     have hgoal :(FiniteCompMeasureKernelNat (Nat.find h') μ K) (choose h1) =
-  --       (@Finset.sum (Set ((a : ℕ) → α a)) ℝ≥0∞ NonUnitalNonAssocSemiring.toAddCommMonoid S fun x ↦
-  --         if h : ∃ n, x ∈ cylinder_n α n then (FiniteCompMeasureKernelNat (Nat.find (h2 x h)) μ K) (choose (h3 x h)) else 0 : ℝ≥0∞)
-  --         := by {
-  --           rw [hhh]
+theorem MeasureCompKernelNatContentSAdditive
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]
+  (μ : Measure (α 0))
+  [hμ : IsProbabilityMeasure μ]
+  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  [hK : ∀n, IsMarkovKernel (K n)]
+  : (MeasureKernelSequenceContent μ K).sAdditive := by {
 
-
-  --         }
-  --     -- rw [hhh]
-  --     exact hgoal
 }
-
-
-lemma rectangles_SetAlgebra (α : ℕ -> Type* ) [mα : ∀n, MeasurableSpace (α n)]: IsSetAlgebra (rectangles α) := by {
-  sorry
-}
-
 
 -- def rectangles (α : ℕ -> Type*) [mα : ∀n, MeasurableSpace (α n)]
 --  := {S : Set (∀n, α n) | ∃n T, MeasurableSet T ∧ S = {k | k <= n}.restrict ⁻¹' T}
