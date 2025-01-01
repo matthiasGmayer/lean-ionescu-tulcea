@@ -6,6 +6,7 @@ import Mathlib
 set_option autoImplicit true
 /- open namespaces that you use to shorten names and enable notation. -/
 open Function Set Classical
+open ENNReal
 
 /- recommended whenever you define anything new. -/
 noncomputable section
@@ -52,12 +53,18 @@ def change_right [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
 
 def Kernel.compProd'
   (K : Kernel α β)
-  (p : ProdLikeM F α β)
+  [p : ProdLikeM F α β]
   (L : Kernel p γ)
-  (q : ProdLikeM F' β γ)
+  [q : ProdLikeM F' β γ]
   : Kernel α q :=
   change_right (K ⊗ₖ (change_left L p.equiv)) q.equiv.symm
 
+
+def ProdLikeM.slice
+  [p : ProdLikeM γ α β]
+  (B : Set γ)
+  (a : α)
+  : Set β :=  {b : β | p.equiv.symm (a,b) ∈ B}
 
 
 -- infixl:100 " ⊗ₖ' " => Kernel.compProd'

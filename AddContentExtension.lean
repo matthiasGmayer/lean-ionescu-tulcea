@@ -64,6 +64,14 @@ def mk' (C : Set (Set α)) (hAlg : IsSetAlgebra C) (toFun : Set α -> ℝ≥0∞
     }
   }
 
+
+omit mα in
+@[simp]
+lemma mk'_on_C (C : Set (Set α)) (hAlg : IsSetAlgebra C) (toFun : Set α -> ℝ≥0∞) (empty' : toFun ∅ = 0)
+  (additivity : ∀s ∈ C, ∀t ∈ C, (Disjoint s t) -> toFun (s ∪ t) = toFun s + toFun t)
+  (s : Set α)
+  : mk' C hAlg toFun empty' additivity s = toFun s := by rfl
+
 variable (hAlg : IsSetAlgebra S)
 open MeasureTheory AddContent OuterMeasure Membership ENNReal MeasurableSpace
 
