@@ -414,6 +414,15 @@ def equiv_5 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (m n : ℕ)
       · simp_all only [not_le]
         apply measurable_snd
   }
+
+def equiv_6 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ) (m : ℕ)
+  :(∀k : {k| k <= n+m}, α k) ≃ᵐ (∀k : {k | k <= n}, α k) × (∀k : {k | n < k ∧ k <= n+m}, α k)
+  := equiv_4 _ _ (by omega)
+
+def equiv_7 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
+  :(∀k : {k| n < k ∧ k <= n + m + 1}, α k) ≃ᵐ (∀k : {k | n < k ∧ k <= n + m}, α k) × (α (n + m +1))
+  := equiv_5 _ _ (by omega)
+
 instance {α : ℕ -> Type*} [∀n, MeasurableSpace (α n)] (n : ℕ)
   : ProdLikeM (∀k : {k| k <= n + 1}, α k) (∀k : {k | k <= n}, α k) (α (n+1)) where
   equiv := equiv n
@@ -425,6 +434,15 @@ instance prod_equiv_2 {α : ℕ -> Type*} [∀n, MeasurableSpace (α n)] (n : �
 instance prod_equiv_3 {α : ℕ -> Type*} [∀n, MeasurableSpace (α n)] (n : ℕ)
   : ProdLikeM (∀k : {k| 0 < k ∧ k <= n + 1 }, α k) (∀(k : {k | 0 < k ∧ k <= n}), α k) (α (n+1)) where
   equiv := equiv_3 (n)
+
+def prod_equiv_6 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
+  : ProdLikeM (∀k : {k| k <= n+m}, α k) (∀k : {k | k <= n}, α k) (∀k : {k | n < k ∧ k <= n+m}, α k)
+  := ⟨equiv_6 n m⟩
+
+instance prod_equiv_7 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
+  : ProdLikeM (∀k : {k| n < k ∧ k <= n + m + 1}, α k) (∀k : {k | n < k ∧ k <= n + m}, α k) (α (n + m +1))
+  := ⟨equiv_7 n m⟩
+
 
 -- instance prod_equiv_4 {α : ℕ -> Type*} [∀n, MeasurableSpace (α n)] (n : ℕ) (m : ℕ)
 -- [hnm : Fact (m <= n + 1)]
@@ -512,61 +530,77 @@ def FiniteCompMeasureKernelNat
   | 0 => convert_measure μ
   | m + 1 => compProd' (FiniteCompMeasureKernelNat μ K m) (K m)
 
-def FiniteCompKernelNat0
-  {α : ℕ -> Type*}
-  [∀m, MeasurableSpace (α m)]
-  (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
-  : (n : ℕ) -> Kernel (α 0) (∀k : {k | 0 < k ∧ k <= n+1}, α k)
-  | 0 => convert_kernel (K 0)
-  | m + 1 =>
-  let p : ProdLikeM ((k : ↑{k | k ≤ m + 1}) → α ↑k) (α 0) ((k : ↑{k | 0 < k ∧ k ≤ m + 1}) → α ↑k)
-  := by {
-    exact prod_equiv_2 m
-  }
-  -- let q : ProdLikeM ((k : ↑{k | 0 < k ∧ k ≤ m + 1 + 1}) → α ↑k) ((k : ↑{k | 0 < k ∧ k ≤ m + 1}) → α ↑k) (α (m + 1 + 1))
-  -- := by {
-  --   exact?
-  -- }
-  Kernel.compProd' (FiniteCompKernelNat0 K m) (K (m+1)) (p := p)
+-- def FiniteCompKernelNat0
+--   {α : ℕ -> Type*}
+--   [∀m, MeasurableSpace (α m)]
+--   (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
+--   : (n : ℕ) -> Kernel (α 0) (∀k : {k | 0 < k ∧ k <= n+1}, α k)
+--   | 0 => convert_kernel (K 0)
+--   | m + 1 =>
+--   let p : ProdLikeM ((k : ↑{k | k ≤ m + 1}) → α ↑k) (α 0) ((k : ↑{k | 0 < k ∧ k ≤ m + 1}) → α ↑k)
+--   := by {
+--     exact prod_equiv_2 m
+--   }
+--   -- let q : ProdLikeM ((k : ↑{k | 0 < k ∧ k ≤ m + 1 + 1}) → α ↑k) ((k : ↑{k | 0 < k ∧ k ≤ m + 1}) → α ↑k) (α (m + 1 + 1))
+--   -- := by {
+--   --   exact?
+--   -- }
+--   Kernel.compProd' (FiniteCompKernelNat0 K m) (K (m+1)) (p := p)
 
 def Kernel_to_unique [MeasurableSpace α] [MeasurableSpace β]
   [Unique β]
   : Kernel α β
   := Kernel.deterministic (default : α -> β) (measurable_const' fun _ ↦ congrFun rfl)
 
+-- def FiniteCompKernelNat
+--   {α : ℕ -> Type*}
+--   [∀m, MeasurableSpace (α m)]
+--   (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
+--   (m : ℕ) (n : ℕ)
+--   : Kernel (∀k: {k | k <= m}, α k) (∀k : {k | m < k ∧ k <= n+1}, α k)
+--   := by {
+--     by_cases hle : n < m
+--     let hU : Unique ((k : ↑{k | m < k ∧ k ≤ n + 1}) → α ↑k) := by {
+--       rw [show {k | m < k ∧ k <= n + 1} = ∅ by ext;simp;omega]
+--       apply Pi.uniqueOfIsEmpty
+--     }
+--     exact Kernel_to_unique
+--     by_cases h : n = m
+--     subst h
+--     exact convert_kernel (K n)
+--     have hge : n > m := by omega
+--     let n' := n - 1
+--     have hn' : n' + 1 = n := by omega
+--     let p : ProdLikeM _ _ _
+--     := ⟨equiv_4 (α := α) m (n'+1) (by omega)⟩
+--     let K' := K n
+--     -- rw [<- hn'] at K'
+--     -- #check  Kernel.compProd' (FiniteCompKernelNat K m n') K' (p := p)
+--     let q : ProdLikeM ((k : ↑{k | m < k ∧ k ≤ n + 1}) → α ↑k) ((k : ↑{k | m < k ∧ k ≤ n' + 1}) → α ↑k) (α (n' + 1 + 1))
+--       := by {
+--         rw [hn']
+--         exact ⟨equiv_5 m (n) (by {omega})⟩
+--       }
+--     rw [<- hn'] at K'
+--     exact Kernel.compProd' (FiniteCompKernelNat K m n') K' (p := p) (q := q)
+--       (F' := (∀k : {k | m < k ∧ k <= n+1}, α k))
+--   }
+
 def FiniteCompKernelNat
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
   (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
-  (m : ℕ) (n : ℕ)
-  : Kernel (∀k: {k | k <= m}, α k) (∀k : {k | m < k ∧ k <= n+1}, α k)
-  := by {
-    by_cases hle : n < m
-    let hU : Unique ((k : ↑{k | m < k ∧ k ≤ n + 1}) → α ↑k) := by {
-      rw [show {k | m < k ∧ k <= n + 1} = ∅ by ext;simp;omega]
-      apply Pi.uniqueOfIsEmpty
-    }
-    exact Kernel_to_unique
-    by_cases h : n = m
-    subst h
-    exact convert_kernel (K n)
-    have hge : n > m := by omega
-    let n' := n - 1
-    have hn' : n' + 1 = n := by omega
-    let p : ProdLikeM _ _ _
-    := ⟨equiv_4 (α := α) m (n'+1) (by omega)⟩
-    let K' := K n
-    -- rw [<- hn'] at K'
-    -- #check  Kernel.compProd' (FiniteCompKernelNat K m n') K' (p := p)
-    let q : ProdLikeM ((k : ↑{k | m < k ∧ k ≤ n + 1}) → α ↑k) ((k : ↑{k | m < k ∧ k ≤ n' + 1}) → α ↑k) (α (n' + 1 + 1))
-      := by {
-        rw [hn']
-        exact ⟨equiv_5 m (n) (by {omega})⟩
-      }
-    rw [<- hn'] at K'
-    exact Kernel.compProd' (FiniteCompKernelNat K m n') K' (p := p) (q := q)
-      (F' := (∀k : {k | m < k ∧ k <= n+1}, α k))
-  }
+  (n : ℕ) (m : ℕ)
+  : Kernel (∀k: {k | k <= n}, α k) (∀k : {k | n < k ∧ k <= n+m+1}, α k)
+  :=
+  match m with
+  | 0 => convert_kernel (K n)
+  | m+1 =>
+    let p : ProdLikeM ((k : ↑{k | k ≤ n + m + 1}) → α ↑k) ((k : ↑{k | k ≤ n}) → α ↑k)
+      ((k : ↑{k | n < k ∧ k ≤ n + m + 1}) → α ↑k)
+      := prod_equiv_6 n (m+1)
+    Kernel.compProd' (FiniteCompKernelNat K n m) (K (n + m + 1))
+
 
 instance compProd'_stays_probability
   [MeasurableSpace α]
@@ -604,6 +638,66 @@ instance finite_comp_stays_probability
     }
   }
 
+instance Kernel.compProd'_stays_markov
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  [MeasurableSpace γ]
+  [MeasurableSpace δ]
+  [MeasurableSpace ε]
+  [p : ProdLikeM γ α β]
+  [q : ProdLikeM ε β δ]
+  (K : Kernel α β)
+  (L : Kernel γ δ)
+  [IsMarkovKernel K]
+  [IsMarkovKernel L]
+  : IsMarkovKernel (Kernel.compProd' K L : Kernel α ε) := by {
+    -- rw [compProd'_def]
+    rw [show Kernel.compProd' K L =
+    change_right (K ⊗ₖ change_left L ProdLikeM.equiv) ProdLikeM.equiv.symm from rfl]
+    unfold change_left change_right
+    refine
+      Kernel.IsMarkovKernel.map
+        (K ⊗ₖ L.comap ProdLikeM.equiv.invFun ProdLikeM.equiv.measurable_invFun) ?_
+    measurability
+  }
+
+instance convert_kernel_stays_markov
+  -- {α β: Type*}
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  [MeasurableSpace γ]
+  [MeasurableSpace δ]
+  (K : Kernel α β)
+  [mK : IsMarkovKernel K]
+  [e: EquivalentMeasurableSpace α γ]
+  [f : EquivalentMeasurableSpace β δ]
+  : IsMarkovKernel (convert_kernel K : Kernel γ δ) := by {
+    unfold convert_kernel
+    simp
+    have m : IsMarkovKernel (K.map f.equiv) := by {
+      apply Kernel.IsMarkovKernel.map
+      apply MeasurableEquiv.measurable
+    }
+    apply Kernel.IsMarkovKernel.comap (K.map ⇑EquivalentMeasurableSpace.equiv) convert_kernel.proof_1
+  }
+
+instance Kernel.FiniteCompProd'_stays_markov
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
+  [∀m, IsMarkovKernel (K m)]
+  (m : ℕ) (n : ℕ)
+  : IsMarkovKernel (FiniteCompKernelNat K n m) := by {
+    induction m with
+    | zero => {
+      simp [FiniteCompKernelNat]
+      infer_instance
+    }
+    | succ m => {
+      simp [FiniteCompKernelNat]
+      infer_instance
+    }
+  }
 
 def kernel_slice
   [MeasurableSpace α ]
