@@ -519,6 +519,11 @@ instance [MeasurableSpace α] [MeasurableSpace β] [e : EquivalentMeasurableSpac
   equiv := e.equiv.symm
 
 
+instance ( α : ℕ -> Type*) : Coe (α 0) (∀k : {k | k <= 0}, α k) where
+  coe x n:= by {
+    rw [Nat.eq_zero_of_le_zero n.2]
+    exact x
+  }
 
 def FiniteCompMeasureKernelNat
   {α : ℕ -> Type*}
@@ -1048,4 +1053,68 @@ lemma cylinders_SetAlgebra (α : ℕ -> Type*) [mα : ∀n, MeasurableSpace (α 
     · exact MeasurableSet.union xms yms
     · rw [<- hy, <- hx]
       rfl
+  }
+
+def compose
+  {α : I -> Type*} {J K : Set I}
+  [∀i, Inhabited (α i)]
+  (ω₁ : (∀i:J, α i))
+  (ω₂ : (∀i:K, α i)) (i : I) : α i :=
+    if h : i ∈ J then
+      ω₁ ⟨i,h⟩
+    else if h: i ∈ K then
+      ω₂ ⟨i,h⟩
+    else default
+
+def compose'
+  {α : I -> Type*} {J K L : Set I}
+  [∀i, Inhabited (α i)]
+  (ω₁ : (∀i:J, α i))
+  (ω₂ : (∀i:K, α i)) := L.restrict (compose ω₁ ω₂)
+
+def blowup
+  {α : I -> Type*}
+  {i : I}
+  (a : α i)
+  : (∀j : ({i} : Set I), α j) := by {
+    intro j
+    rw [j.2]
+    exact a
+  }
+
+def compapp
+  {α : I -> Type*} {J L : Set I}
+  {i : I}
+  [∀i, Inhabited (α i)]
+  (ω₁ : (∀i:J, α i))
+  (ω₂ : (α i))
+  := L.restrict (compose ω₁ <| blowup ω₂)
+
+lemma compapp_apply
+  {α : I -> Type*} {J L : Set I}
+  {i j : I}
+  [∀i, Inhabited (α i)]
+  (ω₁ : (∀i:J, α i))
+  (ω₂ : (α i))
+  (h : j ∈ J)
+  (h2 : j ∈ L)
+  : compapp (L := L) ω₁ ω₂ ⟨j, h2⟩ = ω₁ ⟨j, h⟩ := by {
+    simp [compapp, compose, blowup, *]
+  }
+
+theorem measurable_compose
+  {α : I -> Type*} {J K : Set I}
+  [∀i, Inhabited (α i)]
+  [∀n, MeasurableSpace (α n)]
+  (ω₁ : (∀i:J, α i))
+  : Measurable (compose (α := α) (K := K) ω₁) := by {
+    unfold compose
+    apply measurable_pi_lambda
+    intro i
+    by_cases hJ : i ∈ J
+    simp [hJ]
+    by_cases hK : i ∈ K
+    simp [hJ, hK]
+    apply measurable_pi_apply
+    simp [hJ, hK]
   }

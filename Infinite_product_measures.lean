@@ -1,12 +1,13 @@
 /- It is fine to import all of Mathlib in your project.
 This might make the loading time of a file a bit longer. If you want a good chunk of Mathlib, but not everything, you can `import Mathlib.Tactic` and then add more imports as necessary. -/
 import IonescuTulcea
+import IonescuTulcea.finiteCompProd
 import Mathlib
 -- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 
 set_option autoImplicit true
 /- open namespaces that you use to shorten names and enable notation. -/
-open Function Set Classical ENNReal
+open Function Set Classical ENNReal ProductProbabilityMeasure
 
 /- recommended whenever you define anything new. -/
 noncomputable section
@@ -15,7 +16,7 @@ noncomputable section
 /- Now write definitions and theorems. -/
 
 namespace ProductProbabilityMeasure
-open MeasureTheory MeasurableSpace Measurable ProductLike
+open MeasureTheory MeasurableSpace Measurable ProductLike ProductProbabilityMeasure
 
 -- Ionescu-Tulcea
 open ProbabilityMeasure Measure ProductLike
@@ -145,33 +146,6 @@ def MeasureKernelSequenceContent
 -- lemma seq_inf : Tendsto a atTop 0 :
 open Filter Topology
 
-def compose
-  {α : I -> Type*} {J K : Set I}
-  [∀i, Inhabited (α i)]
-  (ω₁ : (∀i:J, α i))
-  (ω₂ : (∀i:K, α i)) (i : I) : α i :=
-    if h : i ∈ J then
-      ω₁ ⟨i,h⟩
-    else if h: i ∈ K then
-      ω₂ ⟨i,h⟩
-    else default
-
-theorem measurable_compose
-  {α : I -> Type*} {J K : Set I}
-  [∀i, Inhabited (α i)]
-  [∀n, MeasurableSpace (α n)]
-  (ω₁ : (∀i:J, α i))
-  : Measurable (compose (α := α) (K := K) ω₁) := by {
-    unfold compose
-    apply measurable_pi_lambda
-    intro i
-    by_cases hJ : i ∈ J
-    simp [hJ]
-    by_cases hK : i ∈ K
-    simp [hJ, hK]
-    apply measurable_pi_apply
-    simp [hJ, hK]
-  }
 
 -- def slice {α : I -> Type*} (J : Set I)
 --   (A : Set (∀i : J, α i)) (K : Set I) (ω : (∀i : K, α i))
@@ -219,14 +193,6 @@ def partial_apply_kernel_n {α : ℕ -> Type*} {n:ℕ}
     exact K.measurable'
   }
 
-
-def shift {α : ℕ -> Sort*} (f : (n : ℕ) -> α n) (n m: ℕ) := f (n + m)
-
-instance {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m: ℕ)
-  : MeasurableSpace (shift α n m)
-  := mα (n+m)
-
-
 theorem MeasureCompKernelNatContentSAdditive
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
@@ -248,6 +214,7 @@ theorem MeasureCompKernelNatContentSAdditive
       intro B hB hmono hempsect
       by_contra hcontra
       let A n := choose (hB n)
+      have hA n : MeasurableSet (A n) := (choose_spec (hB n)).1
       have hAB n : {k|k<=n}.restrict ⁻¹' A n = B n := sorry
       have hABμ n: MeasureKernelSequenceContent μ K (B n)
         = FiniteCompMeasureKernelNat μ K n (A n) := sorry
@@ -267,21 +234,16 @@ theorem MeasureCompKernelNatContentSAdditive
         rw [hempsect] at inB
         contradiction
       }
-
-      -- let
-      -- let Q n m ω' := sorry
-      -- #check (Kernel.compProd' (K 2) (K 3) : Kernel _ {k | 1 <= k ∧ k <= 2})
-      -- #check fun n m => FiniteCompKernelNat K n m
-      -- #check fun n => shift K n
       let Q n m := FiniteCompKernelNat K n m
       #check Q
       #check kernel_slice
-      let p n m : ProdLikeM _ _ _ := ⟨equiv_4 (α := α) n (n + m + 1) (by omega)⟩
-      let f n m := kernel_slice (Q n (n + m)) (A (n + m + 1))
+      let p n m : ProdLikeM _ _ _ := ⟨equiv_6 (α := α) n (m + 1)⟩
+      let f n m := kernel_slice (Q n m) (A (n + m + 1))
         (p := p n m)
 
 
       have hAmem n ω : ω ∈ A (n + 1) -> {k|k<=n}.restrict₂ (by simp; omega) ω ∈ A n := by {
+        sorry
         unfold A
         generalize_proofs h1 h2 h3
         intro h
@@ -312,7 +274,8 @@ theorem MeasureCompKernelNatContentSAdditive
         assumption
       }
 
-      have hf n ω :f n 0 ω > 0 -> ω ∈ A n := by {
+      have hf n ω : f n 0 ω > 0 -> ω ∈ A n := by {
+        sorry
         unfold f
         simp
         intro h
@@ -345,6 +308,7 @@ theorem MeasureCompKernelNatContentSAdditive
       }
 
       suffices ∃ω, ∀n, ⨅m, f n m ({k|k<=n}.restrict ω) > 0 by {
+        sorry
         obtain ⟨ω, hω⟩ := this
         use ω
         intro n
@@ -357,25 +321,45 @@ theorem MeasureCompKernelNatContentSAdditive
       }
 
 
+      -- suffices ∀n, ∃ω, ⨅m, f n m ω > 0 by {
+      --   let n : ℕ  := sorry
+      --   let ω := fun n => choose (this n)
+      --   -- use ω
+      -- }
+
+      have hQ n m : IsMarkovKernel (Q n m) := by unfold Q; infer_instance
+
+      -- #check kernel_application_measurable
+      have fmono : ∀n, Antitone (f n) := by sorry
+      have fpos : ∀n m ω, f n m ω >= 0 := by simp [f, kernel_slice, Q]
+      have fone : ∀n m ω, f n m ω <= 1 := by intros; simp [f, kernel_slice, Q]; apply prob_le_one
+      have hf n m : Measurable (f n m) := by apply kernel_application_measurable; apply hA
+
+      let μ' : Measure <| ∀k : {k | k <= 0}, α k := convert_measure μ
+
+      have hf0m : ∀m, ∫⁻ ω, f 0 m ω ∂μ' = FiniteCompMeasureKernelNat μ K m (A m) := by {
+        sorry
+      }
+
+      have hf0inf : ⨅m, ∫⁻ ω, f 0 m ω ∂μ' = ∫⁻ ω, ⨅m, f 0 m ω ∂μ' := by {
+        sorry
+      }
+
+      have hf1 : ∀n m ω, f n m ω = ∫⁻ ω', f (n+1) m (compose' ω <| blowup ω') ∂K n ω := by {
+        sorry
+      }
+
+      have hf1inf : ∀n ω, ⨅m, f n m ω = ∫⁻ ω', ⨅m, f (n+1) m (compose' ω <| blowup ω') ∂K n ω := by {
+        sorry
+      }
 
 
-      -- let Q : (n : ℕ) -> (∀k : {k | k <= n}, α k) -> (m : ℕ) -> Measure _
-      --     :=  fun n ω m =>
-      --       FiniteCompMeasureKernelNat (α := fun k => α (k-m)) (K n ω) (λ k => K (k-n)) m
-      -- unfold AddContent.sContinuousInEmpty
-      -- intro A
-      -- intro hA
-      -- intro _
-      -- intro hAconv
-
-
-      by_contra hcontra
-      -- have hinf :
-      simp at hcontra
 
 
 
-    · unfold MeasureKernelSequenceContent
+
+    · sorry
+      unfold MeasureKernelSequenceContent
       simp only [coe_setOf, mem_setOf_eq, AddContent.mk'_on_C, preimage_eq_univ_iff]
       have nothing : univ ∈ cylinder_n α 0 := by {
         unfold cylinder_n
@@ -420,9 +404,10 @@ theorem MeasureCompKernelNatContentSAdditive
       exact h2
   }
 
-lemma test : ({0,1}:Set ℕ) = {k|k < 2} := by exact toFinset_inj.mp rfl
+-- lemma test : ({0,1}:Set ℕ) = {k|k < 2} := by exact toFinset_inj.mp rfl
 
 -- lemma test2 : (J : Set I) (hJ : Finite J) : Finset J :=
+/- ENDFILE HERE
 
 def pi_equiv (α : I -> Type*) (J : Set I) (T : Type*) (TJequiv : T ≃ J)
 [mα : ∀i : I, MeasurableSpace (α i)]
