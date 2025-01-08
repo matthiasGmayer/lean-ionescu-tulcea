@@ -746,29 +746,11 @@ lemma measurable_section [MeasurableSpace α] [MeasurableSpace β] (A : Set (α 
     }
 }
 
-
-lemma kernel_application_measurable
-  {α β γ : Type*}
-  [MeasurableSpace α ]
-  [MeasurableSpace β ]
-  [mγ : MeasurableSpace γ ]
-  (K : Kernel α β)
-  [mK : IsMarkovKernel K]
+lemma slice_preimage [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
   [p : ProdLikeM γ α β]
+  (a : α)
   (B : Set γ)
-  (hB : @MeasurableSet _ mγ B)
-  : Measurable (kernel_slice K B (p := p)) := by {
-    unfold kernel_slice ProdLikeM.slice
-    let B' : Set (α × β) := @image γ (α × β) p.equiv B
-    -- p.equiv '' B
-    have hB' : MeasurableSet B' := by {
-      unfold B'
-      apply (MeasurableEquiv.measurableSet_image p.equiv).mpr ?_
-      exact hB
-    }
-    have h : ∀a, {b | ProdLikeM.equiv.symm (a, b) ∈ B} = {b | (a, b) ∈ B'} := by {
-      unfold B';
-      intro a
+  : {b | p.equiv.symm (a,b) ∈ B} = {b | (a, b) ∈ p.equiv '' B}:= by {
       ext x
       simp
       rw [show ProdLikeM.equiv.symm (a, x) ∈ B <->
@@ -783,9 +765,36 @@ lemma kernel_application_measurable
       apply_fun p.equiv.symm at h
       simp at h
       exact h.symm
+  }
+-- lemma slice_preimage_measurable [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
+--   [p : ProdLikeM γ α β]
+--   (B : Set γ)
+--   (hB : MeasurableSet B)
+--   : MeasurableSet <| p.equiv '' B := by {
+--     simp_all only [MeasurableEquiv.measurableSet_image]
+--   }
+
+lemma kernel_application_measurable
+  {α β γ : Type*}
+  [MeasurableSpace α ]
+  [MeasurableSpace β ]
+  [mγ : MeasurableSpace γ ]
+  (K : Kernel α β)
+  [mK : IsMarkovKernel K]
+  [p : ProdLikeM γ α β]
+  (B : Set γ)
+  (hB : @MeasurableSet _ mγ B)
+  : Measurable (kernel_slice K B (p := p)) := by {
+    unfold kernel_slice ProdLikeM.slice
+    let B' : Set (α × β) := p.equiv '' B
+    have hB' : MeasurableSet B' := by {
+      simp_all only [MeasurableEquiv.measurableSet_image, B']
+    }
+    have h : ∀a, {b | ProdLikeM.equiv.symm (a, b) ∈ B} = {b | (a, b) ∈ B'} := by {
+      intro a
+      exact slice_preimage a B
     }
     simp_rw [h]
-
 
     induction B', hB' using induction_on_inter with
     | h_eq => exact generateFrom_prod.symm
@@ -1012,6 +1021,8 @@ lemma KernelLift
     exact hm h s hs
     }
 }
+
+
 
 
 lemma cylinders_SetAlgebra (α : ℕ -> Type*) [mα : ∀n, MeasurableSpace (α n)] : IsSetAlgebra (cylinders α) where

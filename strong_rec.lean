@@ -12,7 +12,7 @@ noncomputable section
 
 def strong_rec_on_nat_aux
   {α : ℕ -> Type*} {h : ∀n (_ : ∀k : {k | k <= n}, α k), Prop}
-  {ω₀ : α 0} (h₀ : h 0 ω₀)
+  {ω₀ : ∀k : {k | k <= 0}, α k} (h₀ : h 0 ω₀)
   [∀n, Inhabited (α n)]
   (ind : ∀n (ω : {ω | h n ω}), ∃ω' : α (n+1), h (n+1) (compapp ω.1 ω'))
   (n : ℕ)
@@ -27,7 +27,7 @@ def strong_rec_on_nat_aux
 
 def strong_rec_on_nat_proj
   {α : ℕ -> Type*} {h : ∀n (_ : ∀k : {k | k <= n}, α k), Prop}
-  {ω₀ : α 0} (h₀ : h 0 ω₀)
+  {ω₀ : ∀k : {k | k <= 0}, α k} (h₀ : h 0 ω₀)
   [∀n, Inhabited (α n)]
   (ind : ∀n (ω : {ω | h n ω}), ∃ω' : α (n+1), h (n+1) (compapp ω.1 ω'))
   (n : ℕ)
@@ -35,7 +35,7 @@ def strong_rec_on_nat_proj
 
 lemma strong_rec_on_nat_aux_restrict
   {α : ℕ -> Type*} {h : ∀n (_ : ∀k : {k | k <= n}, α k), Prop}
-  {ω₀ : α 0} (h₀ : h 0 ω₀)
+  {ω₀ : ∀k : {k | k <= 0}, α k} (h₀ : h 0 ω₀)
   [∀n, Inhabited (α n)]
   (ind : ∀n (ω : {ω | h n ω}), ∃ω' : α (n+1), h (n+1) (compapp ω.1 ω'))
   (n : ℕ)
@@ -64,7 +64,7 @@ lemma strong_rec_on_nat_aux_restrict
   }
 lemma strong_rec_on_nat_proj_restrict
   {α : ℕ -> Type*} {h : ∀n (_ : ∀k : {k | k <= n}, α k), Prop}
-  {ω₀ : α 0} (h₀ : h 0 ω₀)
+  {ω₀ : ∀k : {k | k <= 0}, α k} (h₀ : h 0 ω₀)
   [∀n, Inhabited (α n)]
   (ind : ∀n (ω : {ω | h n ω}), ∃ω' : α (n+1), h (n+1) (compapp ω.1 ω'))
   (n : ℕ)
@@ -79,7 +79,7 @@ lemma strong_rec_on_nat_proj_restrict
   }
 lemma strong_rec_on_nat_proj_prop
   {α : ℕ -> Type*} {h : ∀n (_ : ∀k : {k | k <= n}, α k), Prop}
-  {ω₀ : α 0} (h₀ : h 0 ω₀)
+  {ω₀ : ∀k : {k | k <= 0}, α k} (h₀ : h 0 ω₀)
   [∀n, Inhabited (α n)]
   (ind : ∀n (ω : {ω | h n ω}), ∃ω' : α (n+1), h (n+1) (compapp ω.1 ω'))
   : ∀n, h n <| {k | k <= n}.restrict (strong_rec_on_nat_proj h₀ ind) := by {
@@ -89,7 +89,18 @@ lemma strong_rec_on_nat_proj_prop
   }
 def strong_rec_on_nat
   {α : ℕ -> Type*} {h : ∀n (_ : ∀k : {k | k <= n}, α k), Prop}
-  {ω₀ : α 0} (h₀ : h 0 ω₀)
+  {ω₀ : ∀k : {k | k <= 0}, α k} (h₀ : h 0 ω₀)
   [∀n, Inhabited (α n)]
   (ind : ∀n (ω : {ω | h n ω}), ∃ω' : α (n+1), h (n+1) (compapp ω.1 ω'))
   : {ω | ∀n, h n ({k|k<=n}.restrict ω)} := ⟨strong_rec_on_nat_proj h₀ ind, strong_rec_on_nat_proj_prop h₀ ind⟩
+
+def strong_rec_on_nat_existence
+  {α : ℕ -> Type*} {h : ∀n (_ : ∀k : {k | k <= n}, α k), Prop}
+  {ω₀ : ∀k : {k | k <= 0}, α k} (h₀ : h 0 ω₀)
+  [∀n, Inhabited (α n)]
+  (ind : ∀n (ω : {ω | h n ω}), ∃ω' : α (n+1), h (n+1) (compapp ω.1 ω'))
+  : ∃ω, ∀n, h n ({k|k<=n}.restrict ω) := by {
+    let ω := strong_rec_on_nat h₀ ind
+    use ω.1
+    exact ω.2
+  }

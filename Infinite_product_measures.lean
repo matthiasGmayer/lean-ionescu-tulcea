@@ -2,6 +2,7 @@
 This might make the loading time of a file a bit longer. If you want a good chunk of Mathlib, but not everything, you can `import Mathlib.Tactic` and then add more imports as necessary. -/
 import IonescuTulcea
 import IonescuTulcea.finiteCompProd
+import IonescuTulcea.strong_rec
 import Mathlib
 -- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 
@@ -193,6 +194,18 @@ def partial_apply_kernel_n {α : ℕ -> Type*} {n:ℕ}
     exact K.measurable'
   }
 
+lemma prob_method_integral [MeasurableSpace α] (f : α -> ℝ≥0∞) (μ : Measure α)
+  (hpos: ∫⁻x, f x ∂μ > 0) : ∃x, f x > 0 := by {
+    by_contra h
+    simp at h
+    have h : ∫⁻ x, f x ∂μ = 0 := by {
+      calc ∫⁻ (x : α), f x ∂μ = ∫⁻ (x : α), 0 ∂μ := by congr; ext x; exact h x
+        _ = 0 := by simp
+    }
+    rw [h] at hpos
+    exact (lt_self_iff_false 0).mp hpos
+}
+
 theorem MeasureCompKernelNatContentSAdditive
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
@@ -331,32 +344,59 @@ theorem MeasureCompKernelNatContentSAdditive
 
       -- #check kernel_application_measurable
       have fmono : ∀n, Antitone (f n) := by sorry
-      have fpos : ∀n m ω, f n m ω >= 0 := by simp [f, kernel_slice, Q]
+      -- have fpos : ∀n m ω, f n m ω >= 0 := by simp [f, kernel_slice, Q]
       have fone : ∀n m ω, f n m ω <= 1 := by intros; simp [f, kernel_slice, Q]; apply prob_le_one
       have hf n m : Measurable (f n m) := by apply kernel_application_measurable; apply hA
 
       let μ' : Measure <| ∀k : {k | k <= 0}, α k := convert_measure μ
 
       have hf0m : ∀m, ∫⁻ ω, f 0 m ω ∂μ' = FiniteCompMeasureKernelNat μ K m (A m) := by {
-        sorry
+        intro m
+        unfold f Q
+        rw [kernel_slice_integral]
+        calc ∫⁻ (ω : (k : ↑{k | k ≤ 0}) → α ↑k),
+          kernel_slice (FiniteCompKernelNat K 0 m) (A (0 + m + 1)) (p := p _ _) ω ∂μ' =
+          compProd' μ' (FiniteCompKernelNat K 0 m) (A (0 + m + 1)) ( p := p _ _ ) := by {
+            generalize FiniteCompKernelNat K 0 m = K'
+            -- unfold kernel_slice
+          }
+          _ = FiniteCompMeasureKernelNat μ K m (A m) := by {
+            sorry
+          }
+          -- (FiniteCompMeasureKernelNat μ K m) (A m) := by sorry
+        -- have h : kernel_slice (FiniteCompKernelNat K 0 m) (A (0 + m + 1)) ω
+        --   = FiniteComp
+        -- conv => rhs; rw [show m = 0 + m by simp]
+
       }
 
       have hf0inf : ⨅m, ∫⁻ ω, f 0 m ω ∂μ' = ∫⁻ ω, ⨅m, f 0 m ω ∂μ' := by {
         sorry
       }
 
-      have hf1 : ∀n m ω, f n m ω = ∫⁻ ω', f (n+1) m (compose' ω <| blowup ω') ∂K n ω := by {
+      have hf0ω : ∃ω, ⨅m, f 0 m ω > 0 := by {
         sorry
       }
 
-      have hf1inf : ∀n ω, ⨅m, f n m ω = ∫⁻ ω', ⨅m, f (n+1) m (compose' ω <| blowup ω') ∂K n ω := by {
+      have hf1 : ∀n m ω, f n m ω = ∫⁻ ω', f (n+1) m (compapp ω ω') ∂K n ω := by {
         sorry
       }
 
+      have hf1inf : ∀n ω, ⨅m, f n m ω = ∫⁻ ω', ⨅m, f (n+1) m (compapp ω ω') ∂K n ω := by {
+        sorry
+      }
 
+      -- have hf1ω : ∀n, ∃ω, (⨅m, f n m ω) > 0 := by {
+      -- }
+      sorry
+      apply strong_rec_on_nat_existence (h₀ := choose_spec hf0ω) (h:=fun n ω => ⨅m, f n m ω > 0)
 
-
-
+      intro n ⟨ω, hω⟩
+      simp at hω
+      specialize hf1inf n ω
+      rw [hf1inf] at hω
+      apply prob_method_integral (μ := K n ω)
+      exact hω
 
     · sorry
       unfold MeasureKernelSequenceContent
