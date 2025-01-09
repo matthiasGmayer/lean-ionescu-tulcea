@@ -1,7 +1,10 @@
 /- It is fine to import all of Mathlib in your project.
 This might make the loading time of a file a bit longer. If you want a good chunk of Mathlib, but not everything, you can `import Mathlib.Tactic` and then add more imports as necessary. -/
 import IonescuTulcea.prodLike
+import IonescuTulcea.equivalences
 import Mathlib
+
+open IndexedFamilies
 -- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 
 set_option autoImplicit true
@@ -19,521 +22,22 @@ open MeasureTheory MeasurableSpace Measurable ProductLike
 
 -- Ionescu-Tulcea
 open ProbabilityMeasure Measure ProductLike
-
 open ProbabilityTheory
+open IndexedFamilies
 
 -- @[simps (config := .asFn)]
-lemma Unique.el_eq_el [αU : Unique α] (a b : α) : a = b := Eq.trans (αU.uniq a) (αU.uniq b).symm
 
-def uniqueElim' [αU : Unique α] (β : α → Sort*) (a : α) (x : β a) (a' : α) : β a' := by
-  rw [Unique.el_eq_el a' a]
-  exact x
-
-@[simp]
-lemma uniqueElim'_el [αU : Unique α] (β : α → Sort*) (a : α) (x : β a) :
-  uniqueElim' β a x a = x := by rfl
-
-def Equiv.piUnique' [αU : Unique α] (β : α → Sort*) (a : α) : (∀ i, β i) ≃ β a where
-  toFun f := f a
-  invFun := uniqueElim' β a
-  left_inv f := by ext i; rw [Unique.el_eq_el i a]; rfl
-  right_inv _ := rfl
-
-theorem measurable_uniqueElim' [αU : Unique α]  (β : α → Type*)
-[∀a, MeasurableSpace (β a)]
-    (a : α) :
-    Measurable (uniqueElim' β a) := by {
-      simp_rw [measurable_pi_iff]
-      intro a'
-      rw [Unique.el_eq_el a a']
-      simp
-      exact measurable_id
-    }
-
-def MeasurableEquiv.piUnique' [αU : Unique α] (β : α → Type*) [∀a, MeasurableSpace (β a)]
-  (a : α) : (∀ i, β i) ≃ᵐ β a where
-  toEquiv := Equiv.piUnique' β a
-  measurable_toFun := measurable_pi_apply _
-  measurable_invFun := by {
-    rw [show ⇑(Equiv.piUnique' β a).symm = uniqueElim' β a by rfl]
-    exact measurable_uniqueElim' β a
-  }
-
-lemma not_le_n_is_n_add_one {n : ℕ} {i : {k | k <= n+1}} (h : ¬i <= n) : i = ⟨n+1, by simp⟩  := by {
-  rw [Nat.not_le_eq] at h
-  apply_fun (·.1)
-  exact Nat.le_antisymm i.2 h
-  exact Subtype.val_injective
-}
-
-def equiv {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
-  :(∀k : {k| k <= n + 1}, α k) ≃ᵐ (∀k : {k | k <= n}, α k) × (α (n+1)) where
-  toFun x := ⟨fun i : {k | k <= n} =>
-    x ⟨↑i, by obtain ⟨x,hx⟩ := i; simp at hx; simp; omega ⟩,
-    x ⟨n+1, by simp⟩⟩
-  invFun := fun (x, y) => fun i => if hi : i <= n then x ⟨↑i, hi⟩ else
-    have h : α (n+1) = α ↑i := by rw [not_le_n_is_n_add_one hi]
-    have h' : HEq (mα (n+1)) (mα ↑i) := by rw [not_le_n_is_n_add_one hi]
-    MeasurableEquiv.cast h h' y
-  left_inv := by {
-    simp
-    intro x
-    ext i
-    by_cases hi : i <= n <;> simp [hi]
-    have h := not_le_n_is_n_add_one hi
-    subst h
-    rfl
-  }
-  right_inv := by {
-    intro x
-    ext i
-    · simp [show ↑i <= n from i.2]; rfl
-    · simp; rfl
-  }
-  measurable_toFun := by {
-    -- measurability
-    simp_all only [coe_setOf, mem_setOf_eq, Int.reduceNeg, id_eq, Int.Nat.cast_ofNat_Int, eq_mpr_eq_cast,
-      Equiv.coe_fn_mk]
-    apply Measurable.prod
-    · simp_all only [Int.reduceNeg]
-      apply measurable_pi_lambda
-      intro a
-      simp_all only [Int.reduceNeg]
-      obtain ⟨val, property⟩ := a
-      simp_all only [Int.reduceNeg]
-      apply measurable_pi_apply
-    · simp_all only
-      apply measurable_pi_apply
-  }
-  measurable_invFun := by {
-    simp
-    apply measurable_pi_lambda
-    intro a
-    by_cases ha : a <= n <;> simp [ha]
-    · -- measurability
-      obtain ⟨val, property⟩ := a
-      simp_all only
-      apply Measurable.eval
-      simp_all only
-      apply measurable_fst
-    · -- measurability
-      obtain ⟨val, property⟩ := a
-      simp_all only
-      apply Measurable.comp'
-      · apply MeasurableEquiv.measurable
-      · simp_all only [not_le]
-        apply measurable_snd
-  }
-
-lemma ge0eq0 (i : {k | k <= n}) (h : ↑i ∉ {k | 0 < k ∧ k <= n}) : (i : ℕ) = 0 := by {
-  simp at h
-  by_contra hi
-  have hi2 : (i : ℕ) > 0 := by exact Nat.zero_lt_of_ne_zero hi;
-  specialize h hi2
-  have hi3 : i < (i : ℕ) := calc i <= n := i.2
-    _ < i := h
-  exact (lt_self_iff_false ↑i).mp hi3
-}
-
-def equiv_2 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
-  :(∀k : {k| k <= n}, α k) ≃ᵐ (α 0) × (∀k :{k | 0 < k ∧ k <= n}, α k) where
-  toFun x := ⟨
-    x ⟨0, by simp⟩,
-    fun i : {k | 0 < k ∧ k <= n} =>
-    x ⟨↑i, by obtain ⟨x,hx⟩ := i; simp at hx; simp; omega ⟩
-    ⟩
-  invFun := fun (x, y) => fun i => if hi : ↑i ∈ {k | 0 < k ∧ k <= n} then y ⟨↑i, hi⟩ else
-    have hi0 : (i : ℕ) = 0 := ge0eq0 i hi
-    have h : α 0 = α ↑i := by rw [hi0];
-    have h' : HEq (mα (0)) (mα ↑i) := by rw [hi0]
-    MeasurableEquiv.cast h h' x
-  left_inv := by {
-    -- simp
-    intro x
-    ext i
-    by_cases hi : ↑i ∈ {k | 0 < k ∧ k <= n} <;> simp [hi]
-    · rfl
-    · have h := ge0eq0 i hi
-      unfold MeasurableEquiv.cast
-      simp
-      rw [@cast_eq_iff_heq]
-      generalize_proofs h0
-      have hi2 : i = ⟨0,h0⟩ := by apply_fun (·.1); simp; assumption; exact Subtype.val_injective
-      rw [hi2]
-  }
-  right_inv := by {
-    intro x
-    ext i
-    · rfl
-    · simp; rfl
-  }
-  measurable_toFun := by {
-    -- measurability
-    simp_all only [coe_setOf, mem_setOf_eq, Int.reduceNeg, id_eq, Int.Nat.cast_ofNat_Int, eq_mpr_eq_cast,
-      Equiv.coe_fn_mk]
-    apply Measurable.prod
-    simp_all only
-    apply measurable_pi_apply
-    simp_all only [Int.reduceNeg]
-    apply measurable_pi_lambda
-    intro a
-    simp_all only [Int.reduceNeg]
-    obtain ⟨val, property⟩ := a
-    simp_all only [Int.reduceNeg]
-    apply measurable_pi_apply
-  }
-  measurable_invFun := by {
-    simp
-    apply measurable_pi_lambda
-    intro i
-    by_cases hi :  0 < (i: ℕ) ∧ (i:ℕ) <= n  <;> simp [hi]
-    · -- measurability
-      obtain ⟨val, property⟩ := i
-      obtain ⟨left, right⟩ := hi
-      simp_all only
-      apply Measurable.eval
-      simp_all only
-      apply measurable_snd
-    · -- measurability
-      apply Measurable.comp
-      apply MeasurableEquiv.measurable
-      exact measurable_fst
-  }
-
-lemma not_le_n_is_n_add_one_0 {n : ℕ} {i : {k |0 < k ∧ k <= n+1}} (h : ¬(0 < (i :ℕ) ∧ i <= n)) : i = ⟨n+1, by simp⟩ := by {
-  -- rw [Nat.not_le_eq] at h
-  apply_fun (·.1)
-  simp
-  push_neg at h
-  specialize h i.2.1
-  have h2 : (i :ℕ) <= n + 1 := by exact i.2.2
-  omega
-  exact Subtype.val_injective
-}
-
-def equiv_3 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
-  :(∀k : {k| 0 < k ∧ k <= n + 1}, α k) ≃ᵐ (∀k : {k | 0 < k ∧ k <= n}, α k) × (α (n+1)) where
-  toFun x := ⟨fun i : {k | 0 < k ∧ k <= n} =>
-    x ⟨↑i, by obtain ⟨x,hx⟩ := i; simp at hx; simp; omega ⟩,
-    x ⟨n+1, by simp⟩⟩
-  invFun := fun (x, y) => fun i => if hi : 0 < (i :ℕ) ∧ (i : ℕ) <= n then x ⟨↑i, hi⟩ else
-    have h : α (n+1) = α ↑i := by rw [not_le_n_is_n_add_one_0 hi]
-    have h' : HEq (mα (n+1)) (mα ↑i) := by rw [not_le_n_is_n_add_one_0 hi]
-    MeasurableEquiv.cast h h' y
-  left_inv := by {
-    simp
-    intro x
-    ext i
-    by_cases hi : 0 < (i : ℕ) ∧ i <= n <;> simp [hi]
-    have h := not_le_n_is_n_add_one_0 hi
-    subst h
-    rfl
-  }
-  right_inv := by {
-    intro x
-    ext i
-    · simp [show 0 < ↑i ∧ ↑i <= n from i.2]; rfl
-    · simp; rfl
-  }
-  measurable_toFun := by {
-    -- measurability
-    simp_all only [coe_setOf, mem_setOf_eq, Int.reduceNeg, id_eq, Int.Nat.cast_ofNat_Int, eq_mpr_eq_cast,
-      Equiv.coe_fn_mk]
-    apply Measurable.prod
-    · simp_all only [Int.reduceNeg]
-      apply measurable_pi_lambda
-      intro a
-      simp_all only [Int.reduceNeg]
-      obtain ⟨val, property⟩ := a
-      simp_all only [Int.reduceNeg]
-      apply measurable_pi_apply
-    · simp_all only
-      apply measurable_pi_apply
-  }
-  measurable_invFun := by {
-    simp
-    apply measurable_pi_lambda
-    intro a
-    by_cases ha : a <= n <;> simp [ha]
-    · -- measurability
-      obtain ⟨val, property⟩ := a
-      obtain ⟨left, right⟩ := property
-      simp_all only [↓reduceDIte]
-      apply Measurable.eval
-      simp_all only
-      apply measurable_fst
-    · -- measurability
-      obtain ⟨val, property⟩ := a
-      simp_all only
-      apply Measurable.comp'
-      · apply MeasurableEquiv.measurable
-      · simp_all only [not_le]
-        apply measurable_snd
-  }
-
-def equiv_4 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (m : ℕ) (n : ℕ) (hnm : m <= n)
-  :(∀k : {k| k <= n}, α k) ≃ᵐ (∀k : {k | k <= m}, α k) × (∀k : {k | m < k ∧ k <= n}, α k) where
-  toFun x := ⟨fun i : {k | k <= m} =>
-    x ⟨↑i, by obtain ⟨x,hx⟩ := i; simp at hx; simp; omega⟩,
-    fun i : {k | m < k ∧ k <= n} =>
-    x ⟨↑i, by obtain ⟨x,hx⟩ := i; simp at hx; simp; omega⟩⟩
-  invFun := fun (x, y) => fun i => if hi : (i : ℕ) <= m then x ⟨↑i, hi⟩ else
-    y ⟨↑i, by simp; constructor; omega; exact i.2⟩
-  left_inv := by {
-    simp
-    intro x
-    ext i
-    simp
-    by_cases h : ↑i <= m <;> simp [h]
-  }
-  right_inv := by {
-    intro x
-    ext i
-    · simp [show ↑i<=m from i.2]; rfl
-    · simp [show ¬↑i<=m by have h := i.2.1; omega]; rfl
-  }
-  measurable_toFun := by {
-    simp_all only [coe_setOf, mem_setOf_eq, Int.reduceNeg, id_eq, Equiv.coe_fn_mk]
-    apply Measurable.prod
-    · simp_all only [Int.reduceNeg]
-      apply measurable_pi_lambda
-      intro a
-      simp_all only [Int.reduceNeg]
-      obtain ⟨val, property⟩ := a
-      simp_all only [Int.reduceNeg]
-      apply measurable_pi_apply
-    · simp_all only [Int.reduceNeg]
-      apply measurable_pi_lambda
-      intro a
-      simp_all only [Int.reduceNeg]
-      obtain ⟨val, property⟩ := a
-      obtain ⟨left, right⟩ := property
-      simp_all only [Int.reduceNeg]
-      apply measurable_pi_apply
-    -- simp_all only [coe_setOf, mem_setOf_eq, Int.reduceNeg, id_eq, Int.Nat.cast_ofNat_Int, eq_mpr_eq_cast,
-    --   Equiv.coe_fn_mk]
-    -- apply Measurable.prod
-    -- · simp_all only [Int.reduceNeg]
-    --   apply measurable_pi_lambda
-    --   intro a
-    --   simp_all only [Int.reduceNeg]
-    --   obtain ⟨val, property⟩ := a
-    --   simp_all only [Int.reduceNeg]
-    --   apply measurable_pi_apply
-    -- · simp_all only
-    --   apply measurable_pi_apply
-  }
-  measurable_invFun := by {
-    simp
-    apply measurable_pi_lambda
-    intro a
-    by_cases ha : a <= m <;> simp [ha]
-    · -- measurability
-      obtain ⟨val, property⟩ := a
-      simp_all only
-      apply Measurable.eval
-      simp_all only
-      apply measurable_fst
-    · -- measurability
-      obtain ⟨val, property⟩ := a
-      simp_all only [Int.reduceNeg]
-      apply Measurable.eval
-      simp_all only [not_le]
-      apply measurable_snd
-  }
-
-lemma not_le_n_is_n_add_one_m {m n : ℕ} (hnm : m <= n) {i : {k |m < k ∧ k <= n+1}} (h : ¬(m < (i :ℕ) ∧ i <= n)):
-  i = ⟨n+1, by simp; omega⟩ := by {
-  -- rw [Nat.not_le_eq] at h
-  apply_fun (·.1)
-  simp
-  push_neg at h
-  specialize h i.2.1
-  have h2 : (i :ℕ) <= n + 1 := by exact i.2.2
-  omega
-  exact Subtype.val_injective
-}
-
-def equiv_5 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (m n : ℕ) (hnm : m <= n)
-  :(∀k : {k| m < k ∧ k <= n + 1}, α k) ≃ᵐ (∀k : {k | m < k ∧ k <= n}, α k) × (α (n+1)) where
-  toFun x := ⟨fun i : {k | m < k ∧ k <= n} =>
-    x ⟨↑i, by obtain ⟨x,hx⟩ := i; simp at hx; simp; omega ⟩,
-    x ⟨n+1, by simp; omega⟩
-    ⟩
-  invFun := fun (x, y) => fun i => if hi : m < (i :ℕ) ∧ (i : ℕ) <= n then x ⟨↑i, hi⟩ else
-    have h : α (n+1) = α ↑i := by rw [not_le_n_is_n_add_one_m hnm hi]
-    have h' : HEq (mα (n+1)) (mα ↑i) := by rw [not_le_n_is_n_add_one_m hnm hi]
-    MeasurableEquiv.cast h h' y
-  left_inv := by {
-    simp
-    intro x
-    ext i
-    by_cases hi : m < (i : ℕ) ∧ i <= n <;> simp [hi]
-    have h := not_le_n_is_n_add_one_m hnm hi
-    subst h
-    rfl
-  }
-  right_inv := by {
-    intro x
-    ext i
-    · simp [show m < ↑i ∧ ↑i <= n from i.2]; rfl
-    · simp; rfl
-  }
-  measurable_toFun := by {
-    -- measurability
-    simp_all only [coe_setOf, mem_setOf_eq, Int.reduceNeg, id_eq, Int.Nat.cast_ofNat_Int, eq_mpr_eq_cast,
-      Equiv.coe_fn_mk]
-    apply Measurable.prod
-    · simp_all only [Int.reduceNeg]
-      apply measurable_pi_lambda
-      intro a
-      simp_all only [Int.reduceNeg]
-      obtain ⟨val, property⟩ := a
-      simp_all only [Int.reduceNeg]
-      apply measurable_pi_apply
-    · simp_all only
-      apply measurable_pi_apply
-  }
-  measurable_invFun := by {
-    simp
-    apply measurable_pi_lambda
-    intro a
-    by_cases ha : a <= n <;> simp [ha]
-    · -- measurability
-      obtain ⟨val, property⟩ := a
-      obtain ⟨left, right⟩ := property
-      simp_all only [↓reduceDIte]
-      apply Measurable.eval
-      simp_all only
-      apply measurable_fst
-    · -- measurability
-      obtain ⟨val, property⟩ := a
-      simp_all only
-      apply Measurable.comp'
-      · apply MeasurableEquiv.measurable
-      · simp_all only [not_le]
-        apply measurable_snd
-  }
-
-def equiv_6 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ) (m : ℕ)
-  :(∀k : {k| k <= n+m}, α k) ≃ᵐ (∀k : {k | k <= n}, α k) × (∀k : {k | n < k ∧ k <= n+m}, α k)
-  := equiv_4 _ _ (by omega)
-
-def equiv_7 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
-  :(∀k : {k| n < k ∧ k <= n + m + 1}, α k) ≃ᵐ (∀k : {k | n < k ∧ k <= n + m}, α k) × (α (n + m +1))
-  := equiv_5 _ _ (by omega)
-
-instance {α : ℕ -> Type*} [∀n, MeasurableSpace (α n)] (n : ℕ)
-  : ProdLikeM (∀k : {k| k <= n + 1}, α k) (∀k : {k | k <= n}, α k) (α (n+1)) where
-  equiv := equiv n
-
-instance prod_equiv_2 {α : ℕ -> Type*} [∀n, MeasurableSpace (α n)] (n : ℕ)
-  : ProdLikeM (∀k : {k| k <= n + 1 }, α k) (α 0) (∀(k : {k | 0 < k ∧ k <= n + 1}), α k) where
-  equiv := equiv_2 (n+1)
-
-instance prod_equiv_3 {α : ℕ -> Type*} [∀n, MeasurableSpace (α n)] (n : ℕ)
-  : ProdLikeM (∀k : {k| 0 < k ∧ k <= n + 1 }, α k) (∀(k : {k | 0 < k ∧ k <= n}), α k) (α (n+1)) where
-  equiv := equiv_3 (n)
-
-def prod_equiv_6 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
-  : ProdLikeM (∀k : {k| k <= n+m}, α k) (∀k : {k | k <= n}, α k) (∀k : {k | n < k ∧ k <= n+m}, α k)
-  := ⟨equiv_6 n m⟩
-
-instance prod_equiv_7 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
-  : ProdLikeM (∀k : {k| n < k ∧ k <= n + m + 1}, α k) (∀k : {k | n < k ∧ k <= n + m}, α k) (α (n + m +1))
-  := ⟨equiv_7 n m⟩
-
-
--- instance prod_equiv_4 {α : ℕ -> Type*} [∀n, MeasurableSpace (α n)] (n : ℕ) (m : ℕ)
--- [hnm : Fact (m <= n + 1)]
---   : ProdLikeM (∀k : {k| k <= n + 1 }, α k) (∀(k : {k | k <= m}), α k) (∀(k : {k | m < k ∧ k <= n + 1}), α k) where
---   equiv := equiv_4 m (n+1) hnm.1
-
-class EquivalentMeasurableSpace (α : Type*) (β : Type*)
-  [MeasurableSpace α] [MeasurableSpace β] where
-  equiv : α ≃ᵐ β
-
-instance [MeasurableSpace α]: EquivalentMeasurableSpace α α := ⟨MeasurableEquiv.refl α⟩
-
-def EquivalentMeasurableSpace.symm
-  {α : Type*} {β : Type*}
-  [MeasurableSpace α] [MeasurableSpace β]
-  (e : EquivalentMeasurableSpace α β)
-  : EquivalentMeasurableSpace β α
-  := ⟨e.equiv.symm⟩
-
-def convert_measure [MeasurableSpace α] [MeasurableSpace β]
-  [e : EquivalentMeasurableSpace α β] (μ : Measure α) := μ.map e.equiv
-
-def convert_kernel
-[MeasurableSpace α] [MeasurableSpace β]
-[MeasurableSpace γ] [MeasurableSpace δ]
-  [e : EquivalentMeasurableSpace α γ]
-  [f : EquivalentMeasurableSpace β δ]
-  (K : Kernel α β)
-  : Kernel γ δ
-  :=
-  have h : Measurable (e.equiv.symm)
-    := MeasurableEquiv.measurable EquivalentMeasurableSpace.equiv.symm
-  let K₁ := (K.map f.equiv)
-  let K₂ := (K₁.comap e.equiv.symm h)
-  K₂
-
-
-instance isProb_convert [MeasurableSpace α] [MeasurableSpace β]
-  (μ : Measure α)
-  [EquivalentMeasurableSpace α β] [IsProbabilityMeasure μ]
-    : IsProbabilityMeasure (convert_measure μ : Measure β)  := by {
-      unfold convert_measure
-      apply isProbabilityMeasure_map
-      apply Measurable.aemeasurable
-      apply MeasurableEquiv.measurable
-}
-
-
-instance {α : ℕ -> Type*} [∀m, MeasurableSpace (α m)]
-  : EquivalentMeasurableSpace (∀k : {k | k <= 0}, α k) (α 0) where
-  equiv :=
-      let U : Unique {k | k <= 0} := by {
-          simp; infer_instance
-        -- rw [show {k | k <= n} = {0} by ext; simp]
-        -- exact uniqueSingleton 0
-      }
-      let τ := MeasurableEquiv.piUnique'
-        (α := ({k | k <= 0})) (β := fun x => α ↑x) ⟨0, by simp⟩
-      τ
-
-instance {α : ℕ -> Type*} [∀m, MeasurableSpace (α m)]
-(n : ℕ)
-  : EquivalentMeasurableSpace (∀k : {k | n < k ∧ k <= n+1}, α k) (α (n+1)) where
-  equiv :=
-      let U : Unique {k | n < k ∧ k <= n+1} := by {
-          rw [show {k | n < k ∧ k <= n+1} = {n+1} by ext;simp;omega]
-          infer_instance
-      }
-      let τ := MeasurableEquiv.piUnique'
-        (α := ({k | n < k ∧ k <= n+1})) (β := fun x => α ↑x) ⟨n+1, by simp⟩
-      τ
-instance [MeasurableSpace α] [MeasurableSpace β] [e : EquivalentMeasurableSpace α β]
-: EquivalentMeasurableSpace β α where
-  equiv := e.equiv.symm
-
-
-instance ( α : ℕ -> Type*) : Coe (α 0) (∀k : {k | k <= 0}, α k) where
-  coe x n:= by {
-    rw [Nat.eq_zero_of_le_zero n.2]
-    exact x
-  }
 
 def FiniteCompMeasureKernelNat
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
   (μ : Measure (α 0))
-  (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
+  (K : ∀(m : ℕ), Kernel (⇑α {k|k <= m}) (α (m+1)))
   -- (K : ∀m, Kernel (∀k ≤ m, α k) (α (m+1)))
-  : (n : ℕ) -> Measure (∀k : {k|k <= n}, α k)
+  : (n : ℕ) -> Measure (⇑α {k|k <= n})
   | 0 => convert_measure μ
   | m + 1 => compProd' (FiniteCompMeasureKernelNat μ K m) (K m)
+    (p := ProdLikeM.insert_n_plus_1 m)
 
 -- def FiniteCompKernelNat0
 --   {α : ℕ -> Type*}
@@ -594,17 +98,15 @@ def Kernel_to_unique [MeasurableSpace α] [MeasurableSpace β]
 def FiniteCompKernelNat
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
-  (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
+  (K : ∀(m : ℕ), Kernel (⇑α {k|k <= m}) (α (m+1)))
   (n : ℕ) (m : ℕ)
-  : Kernel (∀k: {k | k <= n}, α k) (∀k : {k | n < k ∧ k <= n+m+1}, α k)
+  : Kernel (⇑α {k | k <= n}) (⇑α {k | n < k ∧ k <= n+m+1})
   :=
   match m with
   | 0 => convert_kernel (K n)
   | m+1 =>
-    let p : ProdLikeM ((k : ↑{k | k ≤ n + m + 1}) → α ↑k) ((k : ↑{k | k ≤ n}) → α ↑k)
-      ((k : ↑{k | n < k ∧ k ≤ n + m + 1}) → α ↑k)
-      := prod_equiv_6 n (m+1)
     Kernel.compProd' (FiniteCompKernelNat K n m) (K (n + m + 1))
+      (p := ProdLikeM.insert_m (α := α) n (m+1))
 
 
 instance compProd'_stays_probability
@@ -939,9 +441,11 @@ lemma restrict_equiv_prod_fst
       ext x y
       simp
       unfold ProdLikeM.equiv
-      unfold instProdLikeMForallValNatMemSetSetOfLeHAddOfNatForall
-      unfold equiv
-      simp [show ↑y<= n from y.2]
+      unfold ProdLikeM.insert_m
+      unfold MeasurableEquiv.insert_m
+      unfold MeasurableEquiv.pi_equiv
+      unfold Equiv.pi_equiv
+      simp [show ↑y <= n from y.2]
       rfl
     }
 lemma restrict_prod_fst
@@ -959,7 +463,7 @@ lemma KernelLift
   -- [∀m, Inhabited (α m)]
   (μ : Measure (α 0))
   [hμ : IsProbabilityMeasure μ ]
-  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  (K : ∀m, Kernel (⇑α {k|k <= m}) (α (m+1)))
   [mK : ∀m, IsMarkovKernel (K m)]
   {n m: ℕ}
   (hnm : n <= m)
@@ -979,13 +483,17 @@ lemma KernelLift
   | succ m hm => {
     intro n hnm
     have hresm := le_to_subset (Nat.le_add_right m 1)
-    have heqm : ∀ (s : Set ((a : ↑{k | k ≤ m}) → α ↑a)), MeasurableSet s →
+    have heqm : ∀ (s : Set (⇑α {k | k ≤ m})), MeasurableSet s →
     (Measure.map (restrict₂ hresm) (FiniteCompMeasureKernelNat μ K (m + 1))) s
       = (FiniteCompMeasureKernelNat μ K m) s := by {
         intro s hs
         rw [restrict_prod_fst]
         unfold FiniteCompMeasureKernelNat
-        rw [compProd'_fst_is_measure]
+        conv => lhs; arg 1; {
+          apply compProd'_fst_is_measure
+            (p := ProdLikeM.insert_n_plus_1 m)
+            (FiniteCompMeasureKernelNat μ K m) (K m)
+        }
         match m with
         | 0 => {
           simp only [Nat.reduceAdd]
