@@ -15,6 +15,10 @@ noncomputable section
 /- Now write definitions and theorems. -/
 
 namespace IndexedFamilies
+
+instance project_coerce {I : Type*} : CoeFun (I -> Type _) (fun _ => Set I -> Type _) where
+  coe α J := ∀k : J, α k
+
 open MeasureTheory MeasurableSpace Measurable ProductLike
 
 -- Ionescu-Tulcea
@@ -72,12 +76,41 @@ def MeasurableEquiv.unique {I : Type*} [IU : Unique I]
     have h : α default = α i := by rw [Unique.default_eq i]
     MeasurableEquiv.cast h (by rw [Unique.default_eq i])
 
+@[simp]
+lemma MeasurableEquiv.unique_apply {I : Type*} [IU : Unique I]
+  (α : I → Type*) [∀i, MeasurableSpace (α i)]
+  (i : I) (x : α default)
+  : MeasurableEquiv.unique α i x =
+    have h : α default = α i := by rw [Unique.default_eq i]
+    MeasurableEquiv.cast h (by rw [Unique.default_eq i]) x := by rfl
+
+@[simp]
+lemma MeasurableEquiv.unique_apply_inv {I : Type*} [IU : Unique I]
+  (α : I → Type*) [∀i, MeasurableSpace (α i)]
+  (i : I) (x : α i)
+  : (MeasurableEquiv.unique α i).symm x =
+    have h : α default = α i := by rw [Unique.default_eq i]
+    (MeasurableEquiv.cast h (by rw [Unique.default_eq i])).symm x := by rfl
+
 def MeasurableEquiv.piUnique' {I : Type*} [IU : Unique I]
   (α : I → Type*) [∀i, MeasurableSpace (α i)]
   (i : I)
   : (∀ i, α i) ≃ᵐ α i :=
     (MeasurableEquiv.piUnique α).trans
     (unique α i)
+
+@[simp]
+lemma MeasurableEquiv.piUnique'_apply {I : Type*} [IU : Unique I]
+  (α : I → Type*) [∀i, MeasurableSpace (α i)]
+  (i : I) (x : ∀i, α i)
+  : MeasurableEquiv.piUnique' α i x = unique α i (MeasurableEquiv.piUnique α x) := by rfl
+
+@[simp]
+lemma MeausrableEquiv.piUnique'_apply_inv {I : Type*} [IU : Unique I]
+  (α : I → Type*) [∀i, MeasurableSpace (α i)]
+  (i : I) (x : α i)
+  : (MeasurableEquiv.piUnique' α i).symm x =
+    (MeasurableEquiv.piUnique α).symm ((MeasurableEquiv.unique α i).symm x) := by rfl
 
 def MeasurableEquiv.piUnique'' {I : Type*} {J : Set I} [Unique J]
   (α : I → Type*) [∀i, MeasurableSpace (α i)]
@@ -86,29 +119,88 @@ def MeasurableEquiv.piUnique'' {I : Type*} {J : Set I} [Unique J]
   : (∀ i : J, α i) ≃ᵐ α i :=
     MeasurableEquiv.piUnique' (fun i : J => α i) ⟨i,hi⟩
 
-instance {α : ℕ -> Type*} [∀m, MeasurableSpace (α m)]
+@[simp]
+lemma MeasurableEquiv.piUnique''_apply {I : Type*} {J : Set I} [Unique J]
+  (α : I → Type*) [∀i, MeasurableSpace (α i)]
+  (i : I) (hi : i ∈ J) (x : ∀i : J, α i)
+  : MeasurableEquiv.piUnique'' α i hi x =
+    MeasurableEquiv.piUnique' (fun i : J => α i) ⟨i,hi⟩ x := by rfl
+
+@[simp]
+lemma MeasurableEquiv.piUnique''_apply_inv {I : Type*} {J : Set I} [Unique J]
+  (α : I → Type*) [∀i, MeasurableSpace (α i)]
+  (i : I) (hi : i ∈ J) (x : α i)
+  : (MeasurableEquiv.piUnique'' α i hi).symm x =
+    (MeasurableEquiv.piUnique' (fun i : J => α i) ⟨i,hi⟩).symm x := by rfl
+
+instance set_le_0_unique : Unique {k | k <= 0} where
+  default := ⟨0, by simp⟩
+  uniq := by {
+    intros x
+    ext
+    simp
+    suffices (x :ℕ) <= 0 by omega
+    exact x.2
+  }
+
+@[simp]
+lemma default_le_0 : (default : {k | k ≤ 0}) = ⟨0,by simp⟩ := by rfl
+
+instance EquivMS_0 {α : ℕ -> Type*} [∀m, MeasurableSpace (α m)]
   : EquivalentMeasurableSpace (∀k : {k | k <= 0}, α k) (α 0) where
   equiv :=
-      let U : Unique {k | k <= 0} := by {
-          simp; infer_instance
-      }
       let τ := MeasurableEquiv.piUnique'
         (I := ({k | k <= 0})) (α := fun x => α ↑x) ⟨0, by simp⟩
       τ
 
-instance {α : ℕ -> Type*} [∀m, MeasurableSpace (α m)] (n : ℕ)
+
+@[simp]
+lemma MeasurableEquiv.cast_apply {α β : Type u}
+  [mα : MeasurableSpace α] [mβ : MeasurableSpace β]
+  (h : α = β) (h' : HEq mα mβ) (x : α) : MeasurableEquiv.cast h h' x = cast h x := by rfl
+
+@[simp]
+lemma EquivMS_0_equiv_apply {α : ℕ -> Type*} [∀m, MeasurableSpace (α m)]
+  (x : ∀k : {k | k <= 0}, α k)
+  : (EquivMS_0.equiv x) = x ⟨0, by simp⟩ := by {
+    unfold EquivalentMeasurableSpace.equiv EquivMS_0
+    simp
+    congr
+  }
+
+instance set_n_unique (n : ℕ) : Unique {k | n < k ∧ k <= n + 1} where
+  default := ⟨n+1, by simp⟩
+  uniq := by {
+    intros x
+    ext
+    simp
+    let h := x.2
+    simp only [mem_setOf_eq] at h
+    omega
+}
+
+@[simp]
+lemma default_n : (default : {k | n < k ∧ k <= n + 1}) = ⟨n+1, by simp⟩ := by {
+  rfl
+}
+
+
+instance EquivMS_n {α : ℕ -> Type*} [∀m, MeasurableSpace (α m)] (n : ℕ)
   : EquivalentMeasurableSpace (∀k : {k | n < k ∧ k <= n+1}, α k) (α (n+1)) where
   equiv :=
-      let U : Unique {k | n < k ∧ k <= n+1} := by {
-          rw [show {k | n < k ∧ k <= n+1} = {n+1} by ext;simp;omega]
-          infer_instance
-      }
       let τ := MeasurableEquiv.piUnique'
         (I := ({k | n < k ∧ k <= n+1})) (α := fun x => α ↑x) ⟨n+1, by simp⟩
       τ
 
-instance project_coerce {I : Type*} : CoeFun (I -> Type _) (fun _ => Set I -> Type _) where
-  coe α J := ∀k : J, α k
+@[simp]
+lemma EquivMS_n_equiv_apply {α : ℕ -> Type*} [∀m, MeasurableSpace (α m)] (n : ℕ)
+  (x : ∀k : {k | n < k ∧ k <= n+1}, α k)
+  : (EquivMS_n n).equiv x = x ⟨n+1, by simp⟩ := by {
+    unfold EquivalentMeasurableSpace.equiv EquivMS_n
+    simp
+    congr
+}
+
 
 def Equiv.pi_equiv
   {α : I -> Type*}
@@ -136,6 +228,30 @@ def Equiv.pi_equiv
     have hJ : (i : I) ∉ J := by rw [@disjoint_right] at h_disjoint; aesop
     aesop
   }
+
+@[simp]
+lemma Equiv.pi_equiv_apply
+  {α : I -> Type*}
+  {J K L : Set I}
+  (h : L = J ∪ K)
+  (h_disjoint : Disjoint J K)
+  (x : ⇑α L)
+  : Equiv.pi_equiv h h_disjoint x
+  = (J.restrict₂ (by aesop) x, K.restrict₂ (by aesop) x) := by {
+    rfl
+  }
+@[simp]
+lemma Equiv.pi_equiv_apply_inv
+  {α : I -> Type*}
+  {J K L : Set I}
+  (h : L = J ∪ K)
+  (h_disjoint : Disjoint J K)
+  (x : ⇑α J) (y : ⇑α K)
+  : (Equiv.pi_equiv h h_disjoint).symm (x,y)
+  = fun i : L => if hJ : (i : I) ∈ J then x ⟨i,hJ⟩ else y ⟨i, by aesop⟩ := by {
+    rfl
+  }
+
 def MeasurableEquiv.pi_equiv
   {α : I -> Type*} [mα : ∀n, MeasurableSpace (α n)]
   {J K L : Set I}
@@ -167,6 +283,28 @@ def MeasurableEquiv.pi_equiv
     apply measurable_pi_apply
     exact measurable_snd
   }
+@[simp]
+lemma MeasurableEquiv.pi_equiv_apply
+  {α : I -> Type*} [mα : ∀n, MeasurableSpace (α n)]
+  {J K L : Set I}
+  (h : L = J ∪ K)
+  (h_disjoint : Disjoint J K)
+  (x : ⇑α L)
+  : MeasurableEquiv.pi_equiv h h_disjoint x
+  = (J.restrict₂ (by aesop) x, K.restrict₂ (by aesop) x) := by {
+    rfl
+  }
+@[simp]
+lemma MeasurableEquiv.pi_equiv_apply_inv
+  {α : I -> Type*} [mα : ∀n, MeasurableSpace (α n)]
+  {J K L : Set I}
+  (h : L = J ∪ K)
+  (h_disjoint : Disjoint J K)
+  (x : ⇑α J) (y : ⇑α K)
+  : (MeasurableEquiv.pi_equiv h h_disjoint).symm (x,y)
+  = fun i : L => if hJ : (i : I) ∈ J then x ⟨i,hJ⟩ else y ⟨i, by aesop⟩ := by {
+    rfl
+  }
 
 def MeasurableEquiv.pi_insert_equiv
   {α : I -> Type*}
@@ -186,6 +324,44 @@ def MeasurableEquiv.pi_insert_equiv
           (MeasurableEquiv.piUnique'' α i hi)
     τ.trans τ₂
 
+@[simp]
+lemma MeasurableEquiv.pi_insert_equiv_apply
+  {α : I -> Type*}
+  [mα : ∀n, MeasurableSpace (α n)]
+  {L J : Set I}
+  {i : I}
+  (h : L = insert i J)
+  (hi : i ∉ J)
+  (x : ⇑α L)
+  : MeasurableEquiv.pi_insert_equiv h hi x
+  = ({k | k ∈ J}.restrict₂ (by aesop) x, x ⟨i, by aesop⟩) := by {
+    rfl
+  }
+
+lemma MeasurableEquiv.trans_symm
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  [MeasurableSpace γ]
+  (e : MeasurableEquiv α β)
+  (f : MeasurableEquiv β γ)
+  : (e.trans f).symm = f.symm.trans e.symm := by rfl
+
+@[simp]
+lemma MeasurableEquiv.pi_insert_equiv_apply_inv
+  {α : I -> Type*}
+  [mα : ∀n, MeasurableSpace (α n)]
+  {L J : Set I}
+  {i : I}
+  (h : L = insert i J)
+  (hi : i ∉ J)
+  (y : ⇑α J × α i)
+  : (MeasurableEquiv.pi_insert_equiv h hi).symm y
+  =  fun j : L => (if hj : (j : I) ∈ J then y.1 ⟨j,hj⟩ else
+    cast (show α i = α j by aesop) y.2 : α j) := by {
+      rfl
+  }
+
+
 def MeasurableEquiv.insert_n_plus_1
   {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
   : (⇑α {k| k <= n + 1}) ≃ᵐ (⇑α {k | k <= n}) × (α (n+1)) :=
@@ -195,10 +371,68 @@ def MeasurableEquiv.insert_n_plus_1
     have hn : n+1 ∉ {k | k ≤ n} := by simp
     MeasurableEquiv.pi_insert_equiv h hn
 
+@[simp]
+lemma MeasurableEquiv.insert_n_plus_1_apply
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
+  (x : ⇑α {k| k <= n + 1})
+  : MeasurableEquiv.insert_n_plus_1 n x
+  = ({k | k <= n}.restrict₂ (by simp; intro a h; omega) x, x ⟨n+1, by simp⟩) := by {
+    rfl
+  }
+
+@[simp]
+lemma MeasurableEquiv.insert_n_plus_1_apply_inv
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
+  (y : ⇑α {k | k <= n} × α (n+1))
+  : (MeasurableEquiv.insert_n_plus_1 n).symm y
+  =  fun j : {k | k <= n+1} => (if hj : (j : ℕ) <= n then y.1 ⟨j,hj⟩ else
+    cast
+    (show α (n+1) = α j by {
+      let h := j.2
+      simp only [mem_setOf_eq] at h
+      congr
+      omega
+    })
+    y.2 : α j) := by {
+      unfold insert_n_plus_1
+      simp
+      generalize_proofs h h2 h3 h4
+      conv => lhs; apply pi_insert_equiv_apply_inv
+      ext j
+      by_cases h : (j : ℕ) <= n <;> simp [h]
+  }
+
 instance ProdLikeM.insert_n_plus_1
   {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
   : ProdLikeM (⇑α {k| k <= n + 1}) (⇑α {k | k <= n}) (α (n+1))
   := ⟨ MeasurableEquiv.insert_n_plus_1 n ⟩
+
+@[simp]
+lemma ProdLikeM.insert_n_plus_1_apply
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
+  (x : ⇑α {k| k <= n + 1})
+  : (ProdLikeM.insert_n_plus_1 n).equiv x
+  = ({k | k <= n}.restrict₂ (by simp; intro a h; omega) x, x ⟨n+1, by simp⟩) := by {
+    rfl
+  }
+@[simp]
+lemma ProdLikeM.insert_n_plus_1_apply_inv
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n : ℕ)
+  (y : ⇑α {k | k <= n} × α (n+1))
+  : (ProdLikeM.insert_n_plus_1 n).equiv.symm y
+  =  fun j : {k | k <= n+1} => (if hj : (j : ℕ) <= n then y.1 ⟨j,hj⟩ else
+    cast
+    (show α (n+1) = α j by {
+      let h := j.2
+      simp only [mem_setOf_eq] at h
+      congr
+      omega
+    })
+    y.2 : α j) := by {
+      simp [ProdLikeM.equiv]
+      conv => lhs; apply MeasurableEquiv.insert_n_plus_1_apply_inv
+      rfl
+  }
 
 def MeasurableEquiv.insert_m {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)]
   (n : ℕ) (m : ℕ)
@@ -212,10 +446,64 @@ def MeasurableEquiv.insert_m {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (�
     }
     MeasurableEquiv.pi_equiv h h_disjoint
 
-instance ProdLikeM.insert_m {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)]
+@[simp]
+lemma MeasurableEquiv.insert_m_apply
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)]
   (n : ℕ) (m : ℕ)
+  (x : ⇑α {k| k <= n+m})
+  : MeasurableEquiv.insert_m n m x
+  = ({k | k <= n}.restrict₂ (by simp; intro a h; omega) x, {k | n < k ∧ k <= n+m}.restrict₂ (by simp) x) := by {
+    rfl
+  }
+
+@[simp]
+lemma MeasurableEquiv.insert_m_apply_inv
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)]
+  (n : ℕ) (m : ℕ)
+  (y : ⇑α {k | k ≤ n} × ⇑α {k | n < k ∧ k ≤ n+m})
+  : (MeasurableEquiv.insert_m n m).symm y
+  = fun j : {k | k ≤ n+m} => if hj : (j : ℕ) ≤ n then y.1 ⟨j,hj⟩ else
+    y.2 ⟨j, by aesop⟩ := by {
+      unfold insert_m
+      simp
+      generalize_proofs h h2 h3 h4
+      conv => lhs; tactic => apply pi_equiv_apply_inv
+      ext j
+      by_cases h : (j : ℕ) ≤ n <;> simp [h]
+  }
+
+instance ProdLikeM.insert_m {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)]
+  (n m : ℕ)
   : ProdLikeM (⇑α {k| k <= n+m}) (⇑α {k | k <= n}) (⇑α {k | n < k ∧ k <= n+m}) :=
   ⟨ MeasurableEquiv.insert_m n m ⟩
+
+instance ProdLikeM.insert_m_plus_1 {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)]
+  (n m: ℕ)
+  : ProdLikeM (⇑α {k| k <= n+m+1}) (⇑α {k | k <= n}) (⇑α {k | n < k ∧ k <= n+m+1}) :=
+  ⟨ MeasurableEquiv.insert_m n (m+1)⟩
+
+@[simp]
+lemma ProdLikeM.insert_m_apply
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)]
+  (n : ℕ) (m : ℕ)
+  (x : ⇑α {k| k <= n+m})
+  : (ProdLikeM.insert_m n m).equiv x
+  = ({k | k <= n}.restrict₂ (by simp; intro a h; omega) x, {k | n < k ∧ k <= n+m}.restrict₂ (by simp) x) := by {
+    rfl
+  }
+
+@[simp]
+lemma ProdLikeM.insert_m_apply_inv
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)]
+  (n : ℕ) (m : ℕ)
+  (y : ⇑α {k | k ≤ n} × ⇑α {k | n < k ∧ k ≤ n+m})
+  : (ProdLikeM.insert_m n m).equiv.symm y
+  = fun j : {k | k ≤ n+m} => if hj : (j : ℕ) ≤ n then y.1 ⟨j,hj⟩ else
+    y.2 ⟨j, by aesop⟩ := by {
+      simp [ProdLikeM.equiv]
+      conv => lhs; apply MeasurableEquiv.insert_m_apply_inv
+      rfl
+  }
 
 def MeasurableEquiv.ge_n_insert_m_plus_1 {α : ℕ -> Type*}
   [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
@@ -226,13 +514,89 @@ def MeasurableEquiv.ge_n_insert_m_plus_1 {α : ℕ -> Type*}
     have hn : n+m+1 ∉ {k | n < k ∧ k ≤ n+m} := by simp
     MeasurableEquiv.pi_insert_equiv h hn
 
+@[simp]
+lemma MeasurableEquiv.ge_n_insert_m_plus_1_apply
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
+  (x : ⇑α {k| n < k ∧ k <= n + m + 1})
+  : MeasurableEquiv.ge_n_insert_m_plus_1 n m x
+  = ({k | n < k ∧ k <= n + m}.restrict₂ (by simp; intro a h; omega) x, x ⟨n+m+1, by simp; omega⟩) := by {
+    rfl
+  }
+
+@[simp]
+lemma MeasurableEquiv.ge_n_insert_m_plus_1_apply_inv
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
+  (y : ⇑α {k | n < k ∧ k <= n + m} × α (n + m + 1))
+  : (MeasurableEquiv.ge_n_insert_m_plus_1 n m).symm y
+  = fun j : {k | n < k ∧ k <= n + m + 1} => if hj : n < (j : ℕ) ∧ (j : ℕ) ≤ n + m then y.1 ⟨j, hj⟩ else
+    cast
+    (show α (n + m + 1) = α j by {
+      let h := j.2
+      simp only [mem_setOf_eq] at h
+      congr
+      omega
+    }) y.2 := by {
+      unfold ge_n_insert_m_plus_1
+      simp
+      conv => lhs; apply pi_insert_equiv_apply_inv
+      ext j
+      simp
+    }
+
 instance ProdLikeM.ge_n_insert_m_plus_1 {α : ℕ -> Type*}
   [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
   : ProdLikeM (⇑α {k| n < k ∧ k <= n + m + 1}) (⇑α {k | n < k ∧ k <= n + m}) (α (n + m + 1)) :=
   ⟨ MeasurableEquiv.ge_n_insert_m_plus_1 n m ⟩
+instance ProdLikeMIn.ge_n_insert_m_plus_1 {α : ℕ -> Type*}
+  [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
+  : ProdLikeMIn (⇑α {k| n < k ∧ k <= n + m + 1}) (⇑α {k | n < k ∧ k <= n + m}) (α (n + m + 1))
+  := ⟨ProdLikeM.ge_n_insert_m_plus_1 n m⟩
 
--- instance ( α : ℕ -> Type*) : Coe (α 0) (∀k : {k | k <= 0}, α k) where
---   coe x n:= by {
---     rw [Nat.eq_zero_of_le_zero n.2]
---     exact x
---   }
+@[simp]
+lemma ProdLikeM.ge_n_insert_m_plus_1_apply
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
+  (x : ⇑α {k| n < k ∧ k <= n + m + 1})
+  : (ProdLikeM.ge_n_insert_m_plus_1 n m).equiv x
+  = ({k | n < k ∧ k <= n + m}.restrict₂ (by simp; intro a h; omega) x, x ⟨n+m+1, by simp; omega⟩) := by {
+    rfl
+  }
+
+@[simp]
+lemma ProdLikeM.ge_n_insert_m_plus_1_apply_inv
+  {α : ℕ -> Type*} [mα : ∀n, MeasurableSpace (α n)] (n m : ℕ)
+  (y : ⇑α {k | n < k ∧ k <= n + m} × α (n + m + 1))
+  : (ProdLikeM.ge_n_insert_m_plus_1 n m).equiv.symm y
+  = fun j : {k | n < k ∧ k <= n + m + 1} => if hj : n < (j : ℕ) ∧ (j : ℕ) ≤ n + m then y.1 ⟨j, hj⟩ else
+    cast
+    (show α (n + m + 1) = α j by {
+      let h := j.2
+      simp only [mem_setOf_eq] at h
+      congr
+      omega
+    }) y.2 := by {
+      simp [ProdLikeM.equiv]
+      have asd := MeasurableEquiv.ge_n_insert_m_plus_1_apply_inv (n:= n) (m:=m) (y:=y)
+      simp only [coe_setOf, mem_setOf_eq] at asd
+      rw [asd]
+      -- rw [MeasurableEquiv.ge_n_insert_m_plus_1_apply_inv (n:= n) (m:=m) (y:=y)]
+      -- conv => lhs; apply MeasurableEquiv.ge_n_insert_m_plus_1_apply_inv
+      -- rfl
+  }
+
+
+
+variable (α : ℕ -> Type*) (n m : ℕ) (J : Set ℕ )
+  [mα : ∀n, MeasurableSpace (α n)]
+
+def test1 : ProdLikeM (⇑α {k | k ≤ m + 1}) (⇑α {k | k ≤ m}) (α (m + 1))
+  := by infer_instance
+
+def test2 : ProdLikeM (⇑α {k | k ≤ n + m + 1}) (⇑α {k | k ≤ n})
+  (⇑α {k | n < k ∧ k ≤ n + m + 1})
+  := by infer_instance
+
+def test3 : ProdLikeMIn (⇑α {k | n < k ∧ k ≤ n + (m + 1) + 1})
+    (⇑α {k | n < k ∧ k ≤ n + m + 1}) (α (n + m + 1 + 1))
+  := by infer_instance
+
+-- #lint

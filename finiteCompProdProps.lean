@@ -22,6 +22,7 @@ open MeasureTheory MeasurableSpace Measurable ProductLike
 open ProbabilityMeasure Measure ProductLike
 
 open ProbabilityTheory
+open IndexedFamilies
 -- @[simp]
 -- lemma kernel_comp_apply
 --   {α : ℕ -> Type*}
@@ -85,11 +86,39 @@ lemma kernel_slice_integral
     all_goals measurability
 }
 
+
+@[simp]
+lemma kernel_slice_integral'
+  {α : ℕ -> Type*}
+  [∀n, MeasurableSpace (α n)]
+  [∀n, Inhabited (α n)]
+  (K : ∀n, Kernel (⇑α {k|k ≤ n}) (α (n+1)))
+  [∀n, IsSFiniteKernel (K n)]
+  (A : ∀n, Set (⇑α {k|k ≤ n}))
+  (hA : MeasurableSet (A n))
+  (n m : ℕ)
+  (ω : ⇑α {k | k ≤ n})
+  :  kernel_slice (p := ProdLikeM.insert_m n (m+1)) (FiniteCompKernelNat K n m) (A (n + m + 1)) ω =
+    ∫⁻ (ω' : α (n + 1)), kernel_slice (p := ProdLikeM.insert_m (n+1) (m+1)) (FiniteCompKernelNat K (n + 1) m)
+      (A (n + 1 + m + 1)) (compapp ω ω') ∂(K n) ω := by {
+
+        conv => rhs; rhs; intro ω'; tactic => {
+          let m' : ℕ := sorry
+          have h : m = m' + 1 := by sorry
+          unfold FiniteCompKernelNat
+          rewrite [h]
+          simp
+
+        }
+      }
+
+
+
 @[simp]
 lemma FiniteCompKernelNat_zero
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
-  (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
+  (K : ∀(m : ℕ), Kernel (⇑α {k|k <= m}) (α (m+1)))
   : FiniteCompKernelNat K n 0 = convert_kernel (K n) := by rfl
 
 @[simp]
@@ -97,9 +126,11 @@ lemma compProd'_measure_kernel_step
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
   (μ : Measure (α 0))
-  (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
+  (K : ∀(m : ℕ), Kernel (⇑α {k|k <= m}) (α (m+1)))
   (n : ℕ)
-  : compProd' (FiniteCompMeasureKernelNat μ K n) (K n) = FiniteCompMeasureKernelNat μ K (n+1) := by rfl
+  : compProd' (FiniteCompMeasureKernelNat μ K n) (K n)
+    (p := ProdLikeM.insert_n_plus_1 n)
+  = FiniteCompMeasureKernelNat μ K (n+1) := by rfl
 
 
 
@@ -107,9 +138,10 @@ lemma compProd'_measure_kernel_step
 lemma Kernel.compProd'_measure_kernel_step
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
-  (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
+  (K : ∀(m : ℕ), Kernel (⇑α  {k|k <= m}) (α (m+1)))
   (n m : ℕ)
-  : Kernel.compProd' (FiniteCompKernelNat K n m) (K (n+m+1)) (p := prod_equiv_6 n (m+1))
+  : Kernel.compProd' (FiniteCompKernelNat K n m) (K (n+m+1))
+    (p := ProdLikeM.insert_m n (m+1))
     = FiniteCompKernelNat K n (m+1) := by rfl
 
 -- lemma assoc_Kernel.compProd'
@@ -237,6 +269,21 @@ lemma switch_ProdLikeM_invFun
     let bd : β × δ := (ab.2, cd.2)
     r.1.symm (ab.1, q.1.symm bd) := by rfl
 
+lemma switch_ProdLikeM_invFun'
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  [MeasurableSpace γ]
+  [MeasurableSpace δ]
+  [MeasurableSpace ε]
+  [MeasurableSpace E]
+  [p : ProdLikeM γ α β] -- γ = α × β
+  [q : ProdLikeM ε β δ] -- ε = β × δ
+  [r : ProdLikeM E α ε] -- ε = β × δ
+  : ⇑switch_ProdLikeM.1.symm = fun (cd : γ × δ) =>
+    let ab : α × β := p.1 cd.1
+    let bd : β × δ := (ab.2, cd.2)
+    r.1.symm (ab.1, q.1.symm bd) := by rfl
+
 lemma compProd_kernel_apply
   [MeasurableSpace α]
   [MeasurableSpace β]
@@ -360,36 +407,19 @@ lemma assoc_compProd'_kernel_compProd'
         · apply Measurable.prod
           apply measurable_fst
           apply measurable_snd
-      · let f a b : ℝ≥0∞ := (sp.equiv.symm ⁻¹' s).indicator 1 (a, b)
-        have heq : (fun a ↦ ∫⁻ (b : δ), (sp.1.symm ⁻¹' s).indicator (fun x => 1) (a, b) ∂L a)
-          = (fun a => ∫⁻ (b : δ), f a b ∂L a) := by rfl
-        rw [heq]
-
-      -- apply Measurable.lintegral_kernel (κ := L)
-        -- (β := δ) (κ := L) (s := (switch_ProdLikeM.equiv.symm.1.1 ⁻¹' s))
-      -- conv => rhs; intro a; si
-
-
-      -- apply_fun r.1
-      -- conv => lhs; unfold ProdLikeM.equiv; simp
-      -- unfold switch_ProdLikeM MeasurableEquiv.switch_equiv
-      --   Equiv.switch_equiv MeasurableEquiv.refl MeasurableEquiv.prodCongr
-
-
-      -- simp [MeasurableEquiv.refl, MeasurableEquiv.prodCongr,
-      --   MeasurableEquiv.switch_equiv, Equiv.switch_equiv]
-
-
-      -- conv => rhs; rhs; intro a; tactic => {
-      --   trans
-      --   apply lintegral_indicator
-      --   apply Measurable.comp'
-      --   apply MeasurableEquiv.measurable
-      --   exact measurable_prod_mk_left
-      --   exact hs
-      --   rw [setLIntegral_one]
-      -- }
-
+      · apply Measurable.lintegral_kernel_prod_right
+        apply Measurable.indicator measurable_one
+        exact (MeasurableEquiv.measurableSet_preimage ProdLikeM.equiv.symm).mpr hs
+      · exact MeasurableEquiv.measurable ProdLikeM.equiv.symm
+      · apply Measurable.indicator measurable_one
+        exact (MeasurableEquiv.measurableSet_preimage ProdLikeM.equiv.symm).mpr hs
+      · apply Measurable.indicator measurable_one
+        exact (MeasurableEquiv.measurableSet_preimage ProdLikeM.equiv.symm).mpr hs
+      · exact (MeasurableEquiv.measurableSet_preimage ProdLikeM.equiv.symm).mpr hs
+      · exact (MeasurableEquiv.measurableSet_preimage ProdLikeM.equiv.symm).mpr hs
+      · exact MeasurableEquiv.measurable ProdLikeM.equiv.symm
+      · exact MeasurableEquiv.measurable ProdLikeM.equiv.symm
+      . exact hs
 }
 
 lemma compProd_Kernelmap
@@ -476,16 +506,19 @@ lemma compProd_Kernelmap
   }
 
 
--- @[simp]
+@[simp]
 lemma compProd'_measure_kernel_convert
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
   (μ : Measure (α 0))
-  (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
+  (K : ∀(m : ℕ), Kernel (⇑α {k|k <= m}) (α (m+1)))
   [mK : ∀m, IsMarkovKernel (K m)]
   [hμ : IsProbabilityMeasure μ]
-  : compProd' (p := prod_equiv_6 n 1) (FiniteCompMeasureKernelNat μ K n) (convert_kernel (K n))
-    = compProd' (FiniteCompMeasureKernelNat μ K n) (K n) := by {
+  : compProd' (p := ProdLikeM.insert_m n (1))
+      (FiniteCompMeasureKernelNat μ K n) (convert_kernel (K n))
+    = compProd' (p := ProdLikeM.insert_n_plus_1 n)
+      (FiniteCompMeasureKernelNat μ K n)
+      (K n) := by {
       have hμ' : IsProbabilityMeasure (FiniteCompMeasureKernelNat μ K n) := by infer_instance
       repeat rw [compProd'_def]
       ext s hs
@@ -498,7 +531,8 @@ lemma compProd'_measure_kernel_convert
         MeasurableEquiv.coe_mk, Equiv.coe_fn_symm_mk, Equiv.refl_symm, Equiv.coe_refl,
         Kernel.comap_id]
       rw [compProd_Kernelmap, Measure.map_apply]
-      rfl
+      congr
+
       all_goals simp_all only [
         Measurable.prod,
         measurable_fst,
@@ -510,6 +544,82 @@ lemma compProd'_measure_kernel_convert
     }
 
 
+lemma equiv_symm_equal_is_equal
+  (e f : α ≃ β) (h : e = f) : e.symm = f.symm := by rw [h]
+lemma mequiv_symm_equal_is_equal
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  (e f : α ≃ᵐ β) (h : e = f) : ⇑e.symm = ⇑f.symm := by rw [h]
+lemma mequiv_symm_left
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  (e : β ≃ᵐ α) (h' : a = e b) : e.symm a = b := by {
+    apply_fun e
+    simp
+    exact h'
+  }
+@[simp]
+lemma equivtofun
+  : { toFun := f, invFun := f', left_inv := h, right_inv := g : Equiv α β}.1 = f := by rfl
+@[simp]
+lemma equivtofun'
+  : { toFun := f, invFun := f', left_inv := h, right_inv := g : Equiv α β} x = f x := by rfl
+-- @[simp]
+-- lemma mequivtofun
+--   [MeasurableSpace α]
+--   [MeasurableSpace β]
+--   : { toFun := f, invFun := f', left_inv := h, right_inv := g, measurable_invFun := h', measurable_toFun := g' : MeasurableEquiv α β}.1 = f := by rfl
+@[simp]
+lemma mequivtofun'
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  {f : α -> β}
+  {f' : β -> α}
+  {h' : Measurable f}
+  {g' : Measurable f'}
+  {g : Function.RightInverse f' f}
+  {h : LeftInverse f' f}
+  (x : α)
+  : { toFun := f, invFun := f', left_inv := h, right_inv := g, measurable_toFun := h', measurable_invFun := g' : MeasurableEquiv α β} x = f x := by rfl
+
+@[simp]
+lemma mequivtoinvfun
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  {f : α -> β}
+  {f' : β -> α}
+  {h' : Measurable f}
+  {g' : Measurable f'}
+  {g : Function.RightInverse f' f}
+  {h : LeftInverse f' f}
+  : { toFun := f, invFun := f', left_inv := h, right_inv := g, measurable_toFun := h', measurable_invFun := g' : MeasurableEquiv α β}.symm.1
+    = {toFun := f, invFun := f', left_inv := h, right_inv := g : Equiv α β}.symm := by rfl
+@[simp]
+lemma mequivtoinvfun'
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  {f : α -> β}
+  {f' : β -> α}
+  {h' : Measurable f}
+  {g' : Measurable f'}
+  {g : Function.RightInverse f' f}
+  {h : LeftInverse f' f}
+  (x : β)
+  : { toFun := f, invFun := f', left_inv := h, right_inv := g, measurable_toFun := h', measurable_invFun := g' : MeasurableEquiv α β}.symm x = f' x := by rfl
+
+@[simp]
+lemma mequivtoinvfun''
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  {f : α -> β}
+  {f' : β -> α}
+  {h' : Measurable f}
+  {g' : Measurable f'}
+  {g : Function.RightInverse f' f}
+  {h : LeftInverse f' f}
+  (x : β)
+  : { toFun := f, invFun := f', left_inv := h, right_inv := g, measurable_toFun := h', measurable_invFun := g' : MeasurableEquiv α β}.symm.toEquiv x = f' x := by rfl
+
 lemma compProd'_measure_kernel_finite_comp
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
@@ -519,86 +629,56 @@ lemma compProd'_measure_kernel_finite_comp
   [hμ : IsProbabilityMeasure μ]
   (n m : ℕ)
   : compProd' (FiniteCompMeasureKernelNat μ K n) (FiniteCompKernelNat K n m)
-    (p := prod_equiv_6 n (m+1))
+    (p := ProdLikeM.insert_m n (m+1))
     = FiniteCompMeasureKernelNat μ K (n+m+1) := by {
       induction m with
       | zero => {
-        rw [FiniteCompKernelNat_zero, compProd'_measure_kernel_convert]
+        rw [FiniteCompKernelNat_zero]
+        rw [compProd'_measure_kernel_convert]
         -- Why does simp not take lemma?
         rfl
       }
       | succ m hm => {
         let _ : IsProbabilityMeasure <| FiniteCompMeasureKernelNat μ K n := by infer_instance
-        let _ : IsProbabilityMeasure <| (FiniteCompMeasureKernelNat μ K (n + (m + 1)) ⊗ₘ K (n + (m + 1))) := by infer_instance
-        let _ : IsProbabilityMeasure ((Measure.map ((instProdLikeMForallValNatMemSetSetOfLeHAddOfNatForall (n + (m + 1))).equiv.symm)
-            (FiniteCompMeasureKernelNat μ K (n + (m + 1)) ⊗ₘ K (n + (m + 1))))) := by {
-              apply isProbabilityMeasure_map ?_
-              simp_all only [coe_setOf, mem_setOf_eq]
-              apply Measurable.aemeasurable
-              apply MeasurableEquiv.measurable
-            }
-        let _ : IsProbabilityMeasure <| FiniteCompMeasureKernelNat μ K (n + (m + 1)) := by infer_instance
-        let _ : IsProbabilityMeasure <|
-          (compProd' (FiniteCompMeasureKernelNat μ K (n + (m + 1))) (K (n + (m + 1)))
-            : Measure ((k : ↑{k | k ≤ n + (m + 1) + 1}) → α ↑k)) := by infer_instance
-        let p := (prod_equiv_6 (α := α) n ((m+1)+1))
+        let _ : ∀n m, IsMarkovKernel (FiniteCompKernelNat K n m) := by intros; infer_instance
         simp only [coe_setOf, mem_setOf_eq]
         rw [<- Kernel.compProd'_measure_kernel_step]
         rw [<- compProd'_measure_kernel_step]
         rw [assoc_compProd'_kernel_compProd']
-
-        -- congrm compProd' (FiniteCompMeasureKernelNat μ K ?_) (K (n + (m + 1)))
+        rw [hm]
         ext s hs
-        unfold compProd' Kernel.compProd' change_right change_left
-        simp only [coe_setOf, mem_setOf_eq, Equiv.invFun_as_coe, MeasurableEquiv.coe_toEquiv_symm]
-        rw [Measure.map_apply]
-        rw [Measure.map_apply (hs := hs)]
-        rw [<-setLIntegral_one, <-lintegral_indicator]
-        rw [<- setLIntegral_one, <-lintegral_indicator]
+        unfold compProd'
+        rw [MeasurableEquiv.map_apply]
+        conv => rhs; apply MeasurableEquiv.map_apply
+        repeat rw [<- setLIntegral_one, <- lintegral_indicator]
         repeat rw [Measure.lintegral_compProd]
-        conv => lhs; rhs; intro a; rhs; intro b; tactic => {
-            exact show ((p.equiv.symm ⁻¹' s).indicator (fun x ↦ 1) (a,b) : ℝ≥0∞)
-            = {b | (a,b) ∈ p.equiv.symm ⁻¹' s}.indicator 1 b by {
-              rfl
-            }
+        congr
+        ext a
+        congr
+        ext b
+        congr
+        apply (show ∀f g s, f = g -> f⁻¹'s = g⁻¹'s by intro f g s h; rw [h])
+        apply mequiv_symm_equal_is_equal
+        ext x : 2
+        simp only [mem_setOf_eq, coe_setOf, switch_ProdLikeM_fun]
+        unfold ProdLikeM.equiv
+        conv => rhs; apply ProdLikeM.insert_n_plus_1_apply
+        congr
+        conv => lhs; rhs; rhs; rhs; rhs; rhs; apply ProdLikeM.insert_m_apply
+        conv => lhs; rhs; rhs; rhs; apply ProdLikeM.ge_n_insert_m_plus_1_apply
+        conv => lhs; rhs; lhs; arg 1; apply ProdLikeM.insert_m_apply
+        conv => lhs; apply ProdLikeM.insert_m_apply_inv
+        simp only [coe_setOf, mem_setOf_eq, restrict₂, id_eq, Int.reduceNeg, eq_mpr_eq_cast,
+          cast_eq, eq_mp_eq_cast, Int.Nat.cast_ofNat_Int]
+        ext j
+        by_cases hj : (j : ℕ) ≤ n <;> simp [hj]
+
+        repeat {
+          try apply Measurable.indicator
+          exact measurable_const
+          rw [MeasurableEquiv.measurableSet_preimage]
+          exact hs
         }
-        conv => lhs; rhs; intro a; tactic => {
-          trans
-          apply lintegral_indicator
-            (show MeasurableSet {b | (a, b) ∈ p.equiv.symm ⁻¹' s} by {
-              simp only [mem_preimage, measurableSet_setOf]
-              apply Measurable.comp'
-              exact MeasurableSet.mem hs
-              apply Measurable.comp'
-              exact MeasurableEquiv.measurable ProdLikeM.equiv.symm
-              exact measurable_prod_mk_left
-            })
-          apply setLIntegral_one
-        }
-
-
-
-
-
-
-        -- simp only [coe_setOf, mem_setOf_eq]
-        -- rw [<-setLIntegral_one s, <-lintegral_indicator]
-
-        unfold compProd' Kernel.compProd' change_right change_left
-        simp only [coe_setOf, mem_setOf_eq, Equiv.invFun_as_coe, MeasurableEquiv.coe_toEquiv_symm]
-        rw [Measure.map_apply]
-
-        rw [<- setLIntegral_one]
-        rw [Measure.setLIntegral_compProd]
-
-        -- rw [<- setLIntegral_one]
-
-        -- apply_fun cast (show ((k : ↑{k | k ≤ n + (m + 1)}) → α ↑k) = ((k : ↑{k | k ≤ n + m + 1}) → α ↑k) from rfl)
-        -- convert HEq _ _
-        -- rw [assoc_compProd'_kernel_compProd']
-
-        -- #check assoc_compProd'_kernel_compProd' (FiniteCompMeasureKernelNat μ K n) (FiniteCompKernelNat K n m)
-        -- rw [<- assoc_compProd'_kernel_compProd' (p := prod_equiv_6 n (m+1))]
-        -- rw [compProd'_measure_kernel_step μ K (n + (m+1)), hm]
+        repeat rw [MeasurableEquiv.measurableSet_preimage]; exact hs
       }
     }

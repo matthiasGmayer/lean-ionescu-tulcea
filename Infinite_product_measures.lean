@@ -2,13 +2,14 @@
 This might make the loading time of a file a bit longer. If you want a good chunk of Mathlib, but not everything, you can `import Mathlib.Tactic` and then add more imports as necessary. -/
 import IonescuTulcea
 import IonescuTulcea.finiteCompProd
+import IonescuTulcea.finiteCompProdProps
 import IonescuTulcea.strong_rec
 import Mathlib
 -- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 
 set_option autoImplicit true
 /- open namespaces that you use to shorten names and enable notation. -/
-open Function Set Classical ENNReal ProductProbabilityMeasure
+open Function Set Classical ENNReal ProductProbabilityMeasure IndexedFamilies
 
 /- recommended whenever you define anything new. -/
 noncomputable section
@@ -205,6 +206,10 @@ lemma prob_method_integral [MeasurableSpace α] (f : α -> ℝ≥0∞) (μ : Mea
     rw [h] at hpos
     exact (lt_self_iff_false 0).mp hpos
 }
+lemma test (f : I -> ℝ≥0∞) (hf : ∀i, f i >= c)
+  : (⨅i, f i) >= c := by {
+    exact le_iInf hf
+  }
 
 theorem MeasureCompKernelNatContentSAdditive
   {α : ℕ -> Type*}
@@ -212,7 +217,7 @@ theorem MeasureCompKernelNatContentSAdditive
   [∀m, Inhabited (α m)]
   (μ : Measure (α 0))
   [hμ : IsProbabilityMeasure μ]
-  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  (K : ∀m, Kernel (⇑α {k|k <= m}) (α (m+1)))
   [hK : ∀n, IsMarkovKernel (K n)]
   : (MeasureKernelSequenceContent μ K).sAdditive := by {
     apply AddContent.sContinuousInEmpty_finite_implies_sAdditive
@@ -248,9 +253,7 @@ theorem MeasureCompKernelNatContentSAdditive
         contradiction
       }
       let Q n m := FiniteCompKernelNat K n m
-      #check Q
-      #check kernel_slice
-      let p n m : ProdLikeM _ _ _ := ⟨equiv_6 (α := α) n (m + 1)⟩
+      let p n m : ProdLikeM _ _ _ := ProdLikeM.insert_m (α := α) n (m + 1)
       let f n m := kernel_slice (Q n m) (A (n + m + 1))
         (p := p n m)
 
@@ -350,40 +353,59 @@ theorem MeasureCompKernelNatContentSAdditive
 
       let μ' : Measure <| ∀k : {k | k <= 0}, α k := convert_measure μ
 
-      have hf0m : ∀m, ∫⁻ ω, f 0 m ω ∂μ' = FiniteCompMeasureKernelNat μ K m (A m) := by {
+      have hf0m : ∀m, ∫⁻ ω, f 0 m ω ∂μ' = FiniteCompMeasureKernelNat μ K (m+1) (A (m+1)) := by {
         intro m
         unfold f Q
         rw [kernel_slice_integral]
-        calc ∫⁻ (ω : (k : ↑{k | k ≤ 0}) → α ↑k),
-          kernel_slice (FiniteCompKernelNat K 0 m) (A (0 + m + 1)) (p := p _ _) ω ∂μ' =
-          compProd' μ' (FiniteCompKernelNat K 0 m) (A (0 + m + 1)) ( p := p _ _ ) := by {
-            generalize FiniteCompKernelNat K 0 m = K'
-            -- unfold kernel_slice
-          }
-          _ = FiniteCompMeasureKernelNat μ K m (A m) := by {
-            sorry
-          }
-          -- (FiniteCompMeasureKernelNat μ K m) (A m) := by sorry
-        -- have h : kernel_slice (FiniteCompKernelNat K 0 m) (A (0 + m + 1)) ω
-        --   = FiniteComp
-        -- conv => rhs; rw [show m = 0 + m by simp]
-
+        rw [show μ' = FiniteCompMeasureKernelNat μ K 0 by rfl]
+        rw [compProd'_measure_kernel_finite_comp]
+        have h0 : {k | k <= 0 + (m+1)} = {k | k <= m+1} := by simp only [zero_add]
+        have h1 : 0+m+1 = m+1 := by simp only [zero_add]
+        congr <;> try rw [h0] <;> try rw [h1]
+        exact congr_arg_heq A h1
+        exact hA (0 + m + 1)
       }
 
       have hf0inf : ⨅m, ∫⁻ ω, f 0 m ω ∂μ' = ∫⁻ ω, ⨅m, f 0 m ω ∂μ' := by {
-        sorry
+        refine Eq.symm (lintegral_iInf (hf 0) (fmono 0) ?_)
+        suffices ∫⁻ (a : (k : ↑{k | k ≤ 0}) → α ↑k), f 0 0 a ∂μ' < ⊤ by {
+          exact LT.lt.ne_top this
+        }
+        refine IsFiniteMeasure.lintegral_lt_top_of_bounded_to_ennreal μ' ?_
+        use 1
+        intro x
+        exact fone 0 0 x
       }
-
+      simp_rw [<- hAB] at hinf
+      simp_rw [<- hAB] at hABμ
+      simp_rw [hABμ] at hinf
       have hf0ω : ∃ω, ⨅m, f 0 m ω > 0 := by {
-        sorry
+        apply prob_method_integral
+        rw [<- hf0inf]
+        simp_rw [hf0m]
+        have h : ∀m, (FiniteCompMeasureKernelNat μ K (m + 1)) (A (m + 1))
+          >= ⨅ n, (FiniteCompMeasureKernelNat μ K n) (A n) := by {
+            intro m
+            apply iInf_le
+        }
+        have h' := le_iInf h
+        calc 0 < _ := hinf
+            _ <= _ := h'
       }
 
       have hf1 : ∀n m ω, f n m ω = ∫⁻ ω', f (n+1) m (compapp ω ω') ∂K n ω := by {
-        sorry
+        intro n m ω
+        unfold f Q
+        simp
+
+        -- conv => rhs; apply kernel_slice_integral
       }
 
       have hf1inf : ∀n ω, ⨅m, f n m ω = ∫⁻ ω', ⨅m, f (n+1) m (compapp ω ω') ∂K n ω := by {
-        sorry
+        intro n ω
+        symm
+        apply lintegral_iInf
+        -- refine Eq.symm (lintegral_iInf (hf n) (fmono 0) ?_)
       }
 
       -- have hf1ω : ∀n, ∃ω, (⨅m, f n m ω) > 0 := by {
