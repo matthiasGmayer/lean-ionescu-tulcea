@@ -393,10 +393,12 @@ theorem MeasureCompKernelNatContentSAdditive
             _ <= _ := h'
       }
 
-      have hf1 : ∀n m ω, f n m ω = ∫⁻ ω', f (n+1) m (compapp ω ω') ∂K n ω := by {
+      have hf1 : ∀n m ω, f n (m+1) ω = ∫⁻ ω', f (n+1) m (compapp ω ω') ∂K n ω := by {
         intro n m ω
         unfold f Q
         simp
+
+
 
         -- conv => rhs; apply kernel_slice_integral
       }

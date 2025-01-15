@@ -2,6 +2,7 @@
 This might make the loading time of a file a bit longer. If you want a good chunk of Mathlib, but not everything, you can `import Mathlib.Tactic` and then add more imports as necessary. -/
 import IonescuTulcea.prodLike
 import IonescuTulcea.finiteCompProd
+-- import IonescuTulcea.indexedfamilies
 import Mathlib
 -- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 
@@ -34,6 +35,95 @@ open IndexedFamilies
 --   kernel_slice (FiniteCompKernelNat K n m) ω
 --   = FiniteCompMeasureKernelNat (K n ω) K m := by {
 --   }
+lemma lintegral_convert_measure
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  (e : EquivalentMeasurableSpace α β)
+  (μ : Measure α)
+  (f : β -> ℝ≥0∞)
+  (hf : Measurable f)
+  : ∫⁻ x, f x ∂(convert_measure μ) = ∫⁻ x, f (e.equiv x) ∂μ := by {
+    unfold convert_measure
+    rw [lintegral_map]
+    exact hf
+    exact MeasurableEquiv.measurable EquivalentMeasurableSpace.equiv
+  }
+
+lemma lintegral_convert_kernel
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  [MeasurableSpace γ]
+  [MeasurableSpace δ]
+  (e : EquivalentMeasurableSpace α γ)
+  (e' : EquivalentMeasurableSpace β δ)
+  (K : Kernel α β)
+  (f : δ -> ℝ≥0∞)
+  (hf : Measurable f)
+  (c : γ)
+  : ∫⁻ x, f x ∂(convert_kernel K : Kernel γ δ) c
+    = ∫⁻ (a : β), f (EquivalentMeasurableSpace.equiv a) ∂K (EquivalentMeasurableSpace.equiv.symm c):= by {
+    unfold convert_kernel
+    simp
+    rw [Kernel.lintegral_map]
+    exact MeasurableEquiv.measurable EquivalentMeasurableSpace.equiv
+    exact hf
+  }
+
+lemma lintegral_compProd'
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  [MeasurableSpace γ]
+  [p : ProdLikeM γ α β]
+  (μ : Measure α)
+  (K : Kernel α β)
+  [IsSFiniteKernel K]
+  [SFinite μ]
+  (f : γ -> ℝ≥0∞)
+  (hf : Measurable f)
+  : ∫⁻ ω, f ω ∂μ ⊗ₘ' K = ∫⁻ (a : α), ∫⁻ (b : β), f (p.equiv.symm (a, b)) ∂K a ∂μ := by {
+    unfold compProd'
+    rw [lintegral_map]
+    rw [lintegral_compProd]
+    all_goals simp [Measurable.comp', MeasurableEquiv.measurable, hf]
+  }
+
+lemma Kernel.lintegral_compProd'
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  [MeasurableSpace γ]
+  [MeasurableSpace δ]
+  [MeasurableSpace ε]
+  (p : ProdLikeM γ α β)
+  (q : ProdLikeM ε β δ)
+  (K : Kernel α β)
+  (L : Kernel γ δ)
+  [IsSFiniteKernel K]
+  [IsSFiniteKernel L]
+  (f : ε -> ℝ≥0∞)
+  (hf : Measurable f)
+  (a : α)
+  : ∫⁻ ω, f ω ∂(K ⊗ₖ' L) a
+    = ∫⁻ (b : β), ∫⁻ (c : δ),
+      f (q.equiv.symm (b, c))
+      ∂L (p.equiv.symm (a, b)) ∂K a := by {
+    rw [Kernel.compProd'_def]
+    unfold change_right change_left
+    rw [Kernel.lintegral_map]
+    rw [Kernel.lintegral_compProd]
+    simp_rw [Kernel.lintegral_comap]
+    simp only [Equiv.invFun_as_coe, MeasurableEquiv.coe_toEquiv_symm]
+    all_goals simp [Measurable.comp', MeasurableEquiv.measurable, hf]
+  }
+
+lemma MeasurableEquivInSet
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  (e : α ≃ᵐ β)
+  (s : Set β)
+  (a : α )
+  : e a ∈ s <-> a ∈ e ⁻¹' s := by {
+    simp
+  }
 
 @[simp]
 lemma kernel_slice_integral
@@ -86,32 +176,106 @@ lemma kernel_slice_integral
     all_goals measurability
 }
 
+-- lemma kernel_slice_fun_apply
+--   [MeasurableSpace α]
+--   [MeasurableSpace β]
+--   [MeasurableSpace γ]
+--   [MeasurableSpace δ]
+--   [p : ProdLikeM δ β γ]
+--   (μ : Measure α)
+--   (K : Kernel β γ)
+--   [IsSFiniteKernel K]
+--   [SFinite μ]
+--   (A : Set δ)
+--   (hA : MeasurableSet A)
+--   (f : α -> β)
+--   : kernel_slice K A (f ω) = kernel_slice (K.comap f) A ω := by {
+
+--   }
+-- def test
+--   {α β : Type}
+--   (f : α -> γ)
+--   (g : β -> δ)
+--   : α × β -> γ × δ
+--   := by {
+--     exact fun a ↦ Prod.map f g a
+--   }
+  -- λ x => (f x.1, g x.2)
+
+lemma preimage_indicator (f : α -> β) (A : Set β) : ((f ⁻¹' A).indicator 1 x : ℝ≥0∞) = A.indicator 1 (f x)  := by {
+  exact rfl
+}
 
 @[simp]
-lemma kernel_slice_integral'
-  {α : ℕ -> Type*}
-  [∀n, MeasurableSpace (α n)]
-  [∀n, Inhabited (α n)]
-  (K : ∀n, Kernel (⇑α {k|k ≤ n}) (α (n+1)))
-  [∀n, IsSFiniteKernel (K n)]
-  (A : ∀n, Set (⇑α {k|k ≤ n}))
-  (hA : MeasurableSet (A n))
-  (n m : ℕ)
-  (ω : ⇑α {k | k ≤ n})
-  :  kernel_slice (p := ProdLikeM.insert_m n (m+1)) (FiniteCompKernelNat K n m) (A (n + m + 1)) ω =
-    ∫⁻ (ω' : α (n + 1)), kernel_slice (p := ProdLikeM.insert_m (n+1) (m+1)) (FiniteCompKernelNat K (n + 1) m)
-      (A (n + 1 + m + 1)) (compapp ω ω') ∂(K n) ω := by {
+lemma kernel_slice_fun_integral
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  [MeasurableSpace γ]
+  [MeasurableSpace δ]
+  [p : ProdLikeM δ β γ]
+  (μ : Measure α)
+  (K : Kernel β γ)
+  [IsSFiniteKernel K]
+  [SFinite μ]
+  (A : Set δ)
+  (hA : MeasurableSet A)
+  (f : α -> β)
+  (hf : Measurable f)
+  : ∫⁻ ω, kernel_slice K A (f ω) ∂μ = (μ ⊗ₘ (K.comap f hf)) (Prod.map f id ⁻¹' (p.1.symm ⁻¹' A)) := by {
+    unfold kernel_slice ProdLikeM.slice
+    simp_rw [slice_preimage]
+    rw [show p.equiv '' A = p.equiv.symm ⁻¹' A by {
+      ext x
+      simp only [mem_image, mem_preimage]
+      constructor
+      intro ⟨y,hy⟩
+      rw [<- hy.2]
+      simp [hy.1]
+      intro h
+      use p.equiv.symm x
+      simp only [h, MeasurableEquiv.apply_symm_apply, and_self]
+    }]
+    generalize hAA' : p.equiv.symm ⁻¹' A = A'
+    have hA' : MeasurableSet A' := by rw [<- hAA']; measurability;
+    have h : ∀ω, (K ω) {b | (ω,b) ∈ A'} = ∫⁻ b, {b|(ω,b) ∈ A'}.indicator 1 b ∂(K ω) := by {
+      intro ω
+      exact Eq.symm (lintegral_indicator_one (by
+      subst hAA'
+      simp_all only [MeasurableEquiv.measurableSet_preimage, mem_preimage, measurableSet_setOf]
+      apply Measurable.comp'
+      · simp_all only [measurable_mem]
+      · apply Measurable.comp'
+        · apply MeasurableEquiv.measurable
+        · apply Measurable.prod
+          · simp_all only [measurable_const]
+          · simp_all only
+            apply measurable_id'))
+    }
+    simp_rw [h]
+    have hfid : Measurable (Prod.map f (@id γ)) := by {
+      apply Measurable.prod <;> simp only [Prod.map_fst, Prod.map_snd]
+      subst hAA'
+      simp_all only [MeasurableEquiv.measurableSet_preimage, mem_preimage]
+      apply Measurable.comp'
+      · exact hf
+      · apply measurable_fst
+      subst hAA'
+      simp_all only [MeasurableEquiv.measurableSet_preimage, mem_preimage, id_eq]
+      apply measurable_snd
+    }
 
-        conv => rhs; rhs; intro ω'; tactic => {
-          let m' : ℕ := sorry
-          have h : m = m' + 1 := by sorry
-          unfold FiniteCompKernelNat
-          rewrite [h]
-          simp
-
-        }
-      }
-
+    conv => rhs; tactic => {
+      rw [<- setLIntegral_one, <- lintegral_indicator]
+      apply MeasurableSet.preimage
+      exact hA'
+      exact hfid
+    }
+    rw [Measure.lintegral_compProd]
+    congr
+    apply Measurable.indicator
+    exact measurable_const
+    exact hfid hA'
+}
 
 
 @[simp]
@@ -129,7 +293,7 @@ lemma compProd'_measure_kernel_step
   (K : ∀(m : ℕ), Kernel (⇑α {k|k <= m}) (α (m+1)))
   (n : ℕ)
   : compProd' (FiniteCompMeasureKernelNat μ K n) (K n)
-    (p := ProdLikeM.insert_n_plus_1 n)
+    -- (p := ProdLikeM.insert_n_plus_1 n)
   = FiniteCompMeasureKernelNat μ K (n+1) := by rfl
 
 
@@ -234,6 +398,19 @@ def switch_ProdLikeM
           MeasurableEquiv.trans τ₂ τ₃
   }⟩
 
+-- instance
+--   ProdlikeM.switch
+--   [MeasurableSpace α]
+--   [MeasurableSpace β]
+--   [MeasurableSpace γ]
+--   [p : ProdLikeM γ α β] -- γ = α × β
+--   [MeasurableSpace δ]
+--   [MeasurableSpace ε]
+--   [q : ProdLikeM ε β δ] -- ε = β × δ
+--   [MeasurableSpace E]
+--   [r : ProdLikeM E α ε] -- ε = β × δ
+--   : ProdLikeM E γ δ := switch_ProdLikeM (p := p) (q := q) (r:=r)
+
 @[simp]
 lemma switch_ProdLikeM_fun
   [MeasurableSpace α]
@@ -246,7 +423,7 @@ lemma switch_ProdLikeM_fun
   [q : ProdLikeM ε β δ] -- ε = β × δ
   [r : ProdLikeM E α ε] -- ε = β × δ
   (e : E)
-  : switch_ProdLikeM.1 e =
+  : (switch_ProdLikeM (q:=q) (r:=r)).1  e =
     let ae : α × ε := r.1 e
     let bd : β × δ := q.1 ae.2
     let c : γ     := p.1.symm (ae.1, bd.1)
@@ -264,7 +441,7 @@ lemma switch_ProdLikeM_invFun
   [q : ProdLikeM ε β δ] -- ε = β × δ
   [r : ProdLikeM E α ε] -- ε = β × δ
   (cd : γ × δ)
-  : switch_ProdLikeM.1.symm cd =
+  : (switch_ProdLikeM (q:=q) (r:=r)).1.symm cd =
     let ab : α × β := p.1 cd.1
     let bd : β × δ := (ab.2, cd.2)
     r.1.symm (ab.1, q.1.symm bd) := by rfl
@@ -279,7 +456,7 @@ lemma switch_ProdLikeM_invFun'
   [p : ProdLikeM γ α β] -- γ = α × β
   [q : ProdLikeM ε β δ] -- ε = β × δ
   [r : ProdLikeM E α ε] -- ε = β × δ
-  : ⇑switch_ProdLikeM.1.symm = fun (cd : γ × δ) =>
+  : ⇑(switch_ProdLikeM (q:=q) (r:=r)).1.symm = fun (cd : γ × δ) =>
     let ab : α × β := p.1 cd.1
     let bd : β × δ := (ab.2, cd.2)
     r.1.symm (ab.1, q.1.symm bd) := by rfl
@@ -323,8 +500,8 @@ lemma assoc_compProd'_kernel_compProd'
   [p : ProdLikeM γ α β] -- γ = α × β
   [q : ProdLikeM ε β δ] -- ε = β × δ
   [r : ProdLikeM E α ε] -- ε = β × δ
-  : (compProd' μ (Kernel.compProd' K L : Kernel α ε) : Measure E)
-    = (compProd' (p := switch_ProdLikeM) (compProd' μ K) L : Measure E) := by {
+  : (compProd' μ (Kernel.compProd' K L))
+    = (compProd' (p := switch_ProdLikeM (q:=q) (r:=r)) (compProd' μ K) L : Measure E) := by {
       ext s hs
       unfold compProd' Kernel.compProd' change_right change_left
       simp only [coe_setOf, mem_setOf_eq, Equiv.invFun_as_coe, MeasurableEquiv.coe_toEquiv_symm]
@@ -389,7 +566,7 @@ lemma assoc_compProd'_kernel_compProd'
       simp only [mem_setOf_eq, mem_preimage, switch_ProdLikeM_invFun,
         MeasurableEquiv.apply_symm_apply]
 
-      all_goals let sp := switch_ProdLikeM (δ:=δ) (α := α) (γ := γ) (E := E)
+      all_goals let sp := switch_ProdLikeM (q:=q) (r:=r)
       · let f a b : ℝ≥0∞ := (sp.equiv.symm ⁻¹' s).indicator 1 (a, b)
         have heq : (fun a => ∫⁻ (b : δ), (sp.equiv.symm ⁻¹' s).indicator
             (fun x ↦ 1) (p.1.symm a, b) ∂L (p.equiv.symm a))
@@ -525,7 +702,7 @@ lemma compProd'_measure_kernel_convert
       repeat rw [MeasurableEquiv.map_apply]
       unfold
         convert_kernel
-        instEquivalentMeasurableSpace
+        EquivalentMeasurableSpace.refl
         MeasurableEquiv.refl
       simp only [coe_setOf, mem_setOf_eq, eq_mpr_eq_cast, MeasurableEquiv.symm_mk,
         MeasurableEquiv.coe_mk, Equiv.coe_fn_symm_mk, Equiv.refl_symm, Equiv.coe_refl,
@@ -682,3 +859,492 @@ lemma compProd'_measure_kernel_finite_comp
         repeat rw [MeasurableEquiv.measurableSet_preimage]; exact hs
       }
     }
+
+-- lemma kernel_apply
+--   {α : ℕ -> Type*}
+--   [∀n, MeasurableSpace (α n)]
+--   [∀n, Inhabited (α n)]
+--   (K : ∀n, Kernel (⇑α {k|k ≤ n}) (α (n+1)))
+--   [∀n, IsMarkovKernel (K n)]
+--   (A : ∀n, Set (⇑α {k|k ≤ n}))
+--   (hA : MeasurableSet (A n))
+--   (n m : ℕ)
+--   (ω : ⇑α {k | k ≤ n})
+-- ((K n) ω ⊗ₘ (FiniteCompKernelNat K (n + 1) m).comap (compapp ω) ())
+-- = FiniteCompKernelNat K n (m)
+-- lemma kernel_slice_compProd
+--   {α : ℕ -> Type*}
+--   [∀n, MeasurableSpace (α n)]
+--   [∀n, Inhabited (α n)]
+--   (K : ∀n, Kernel (⇑α {k|k ≤ n}) (α (n+1)))
+--   [∀n, IsSFiniteKernel (K n)]
+--   (A : ∀n, Set (⇑α {k|k ≤ n}))
+--   (hA : MeasurableSet (A n))
+--   (n m : ℕ)
+--   (ω : ⇑α {k | k ≤ n})
+--   : kernel_slice (FiniteCompKernelNat K n m) (A (n + m + 1)) ω
+--     = (compProd' (K n ω) (FiniteCompKernelNat K (n + 1) m) : Measure (⇑α {K | K ≤ n + m + 1}))
+--       {ω' : ⇑α {k | n < k ∧ k <= n+m+1}| (compose' ω ω' : ⇑α {k | k <= n+m+1}) ∈ (A (n+m+1))} := by {
+
+--     }
+    -- = FiniteCompMeasureKernelNat (K n ω) := sorry
+
+@[simp]
+lemma compapp_null_action
+  {α : I -> Type*}
+  [∀n, Inhabited (α n)]
+  (ω : ⇑α J)
+  {L : Set I}
+  {b : ⇑α K}
+  {i : L}
+  : compapp ω (compose' b ω i) = ω := by {
+    unfold compapp compose compose' blowup
+    simp
+    ext j
+    simp only [mem_singleton_iff, Set.restrict_apply, eq_mpr_eq_cast, Subtype.coe_prop, ↓reduceDIte]
+  }
+
+@[simp]
+lemma compapp_reduce
+  {α : I -> Type*}
+  [∀n, Inhabited (α n)]
+  (ω : ⇑α J)
+  {L : Set I}
+  {b : ⇑α K}
+  {i : L}
+  (hi : (i : I) ∈ K)
+  : compapp ω (compose' b ω i)
+    = compapp (L:=L) ω (b ⟨(i : I),hi⟩ ) := by {
+    unfold compapp compose compose' blowup
+    simp
+    ext j
+    simp only [mem_singleton_iff, Set.restrict_apply, eq_mpr_eq_cast, Subtype.coe_prop, ↓reduceDIte]
+    by_cases h : (j : I) ∈ J <;> simp [h]
+    by_cases h : (j : I) = i <;> simp [h]
+    unfold compose
+    simp [hi]
+  }
+
+lemma mem_congr {a b : α} (s : Set α) (h : a = b) : a ∈ s <-> b ∈ s := by rw [h]
+
+lemma kernel_measurability
+  [MeasurableSpace α]
+  [MeasurableSpace β]
+  [MeasurableSpace γ]
+  (K : Kernel α β)
+  [IsSFiniteKernel K]
+  (f : γ -> α)
+  (g : γ -> β -> ℝ≥0∞)
+  (hf : Measurable f)
+  (hg : Measurable <| uncurry g)
+  : Measurable fun x => ∫⁻ c : β, g x c ∂K (f x) := by {
+    simp_rw [show ∀x, K (f x) = K.comap f hf x by {
+      intro x
+      exact rfl
+    } ]
+    apply lintegral_kernel_prod_left
+    exact measurable_swap_iff.mp hg
+  }
+
+lemma kernel_slice_integral''
+  {α : ℕ -> Type*}
+  [∀n, MeasurableSpace (α n)]
+  [∀n, Inhabited (α n)]
+  (K : ∀n, Kernel (⇑α {k|k ≤ n}) (α (n+1)))
+  [∀n, IsMarkovKernel (K n)]
+  -- (A : ∀n, Set (⇑α {k|k ≤ n}))
+  -- (hA : MeasurableSet (A n))
+  (n m : ℕ)
+  (ω : ⇑α {k | k ≤ n})
+  (f : ⇑α {k | k <= n + (m+1) + 1} -> ℝ≥0∞)
+  (hf : Measurable f)
+  : ∫⁻ (a : ⇑α {k | n < k ∧ k ≤ n + (m + 1) + 1}),
+      f (compose' a ω)
+    ∂(FiniteCompKernelNat K n (m + 1)) ω =
+    ∫⁻ (ω' : α (n + 1)),
+    ∫⁻ (a : ⇑α {k | n + 1 < k ∧ k ≤ n + 1 + m + 1}),
+      f (compapp₃ a ω ω')
+    ∂(FiniteCompKernelNat K (n + 1) m) (compapp ω ω') ∂(K n) ω
+    := by {
+      induction m with
+      | zero => {
+        unfold FiniteCompKernelNat
+        simp only [Nat.reduceAdd, coe_setOf, mem_setOf_eq, Nat.add_zero, FiniteCompKernelNat_zero]
+        rw [Kernel.lintegral_compProd']
+        rw [lintegral_convert_kernel]
+        congr; ext a
+        rw [lintegral_convert_kernel]
+        congr 1
+        ·
+          apply congrArg
+          simp only [ProdLikeM.insert_m_apply_inv, coe_setOf, mem_setOf_eq,
+          eq_mp_eq_cast, id_eq, eq_mpr_eq_cast, EquivalentMeasurableSpace.refl_equiv,
+          MeasurableEquiv.symm_refl, MeasurableEquiv.refl_apply]
+          ext i
+          split_ifs <;> simp [compapp, compose, blowup, *]
+          split_ifs
+          rfl
+          exfalso; omega
+        · ext c; apply congrArg
+          ext i
+          unfold compose' compapp₃ compose
+          simp only [mem_setOf_eq, ProdLikeM.ge_n_insert_m_plus_1_apply_inv, Set.restrict_apply]
+          split_ifs <;> try {exfalso; omega} <;> try rfl
+        · apply Measurable.comp' hf
+          exact measurable_compapp₃_fst ω a
+        ·
+          apply kernel_measurability
+          apply Measurable.comp'
+          apply MeasurableEquiv.measurable
+          exact measurable_prod_mk_left
+          unfold uncurry
+          simp only [Prod.mk.eta, ProdLikeM.ge_n_insert_m_plus_1_apply_inv, coe_setOf, mem_setOf_eq]
+          apply Measurable.comp' hf
+          apply Measurable.comp' (measurable_compose'_fst ω)
+          refine measurable_pi_iff.mpr ?_
+          intro i
+          split_ifs
+          apply Measurable.eval
+          exact measurable_fst
+          generalize_proofs h
+          have hi : (i : ℕ) = n+1+1 := by omega
+          obtain ⟨i,h'⟩ := i
+          simp at hi
+          subst hi
+          simp
+          exact measurable_snd
+        · apply Measurable.comp' hf
+          exact measurable_compose'_fst ω
+      }
+      | succ m hm => {
+        let g := (fun (x : ⇑α {k | k <= n + (m + 1) + 1}) =>
+              let a : α (n+1) := x ⟨n+1, by simp⟩
+              let b : ⇑α {k | n + 1 < k ∧ k ≤ n + 1 + m + 1} :=
+                {k | n + 1 < k ∧ k ≤ n + 1 + m + 1}.restrict₂ (by simp;intros;omega) x
+              ∫⁻ (c : α (n + 1 + m + 1 + 1)), f (compose' (ProdLikeM.equiv.symm (b, c))
+              (compapp (L:={k | k <= n + 1}) ω a)) ∂(K (n + 1 + m + 1)) ((ProdLikeM.insert_m_plus_1 (n + 1) m).equiv.symm (compapp ω a, b))
+            )
+        conv => rhs; rhs; intro ω'; tactic => {
+          unfold FiniteCompKernelNat
+          rw [Kernel.lintegral_compProd']
+          apply Measurable.comp'
+          exact hf
+          apply measurable_compapp₃_fst
+        }
+        conv => rhs; rhs; intro a; rhs; intro b; tactic => {
+          have h : ∫⁻ (c : α (n + 1 + m + 1 + 1)),
+            f (compapp₃ (ProdLikeM.equiv.symm (b, c)) ω a)
+            ∂(K (n + 1 + m + 1))
+              ((ProdLikeM.insert_m_plus_1 (n + 1) m).equiv.symm (compapp ω a, b))
+            = g (compapp₃ b ω a) := by {
+              unfold g
+              simp only [coe_setOf, mem_setOf_eq]
+              congr
+              · ext ⟨val, prop⟩
+                unfold compapp compapp₃ compose blowup
+                simp only [mem_setOf_eq, mem_singleton_iff, eq_mpr_eq_cast, Set.restrict_apply,
+                  lt_self_iff_false, add_le_add_iff_right, false_and, ↓reduceDIte,
+                  add_le_iff_nonpos_right, nonpos_iff_eq_zero, one_ne_zero, cast_eq]
+              · ext ⟨val, prop⟩
+                unfold compapp₃
+                simp only [mem_setOf_eq] at prop
+                simp only [mem_setOf_eq, restrict₂, Set.restrict_apply, and_self, ↓reduceDIte, prop]
+              · ext c
+                congr
+                generalize_proofs h1 h2
+                rw [show (compapp₃ b ω a ⟨n + 1, h2⟩) = a by {
+                  unfold compapp₃
+                  simp only [mem_setOf_eq, Set.restrict_apply, lt_self_iff_false,
+                    add_le_add_iff_right, false_and, ↓reduceDIte, add_le_iff_nonpos_right,
+                    nonpos_iff_eq_zero, one_ne_zero, cast_eq]
+                }]
+                let p := (ProdLikeM.ge_n_insert_m_plus_1_plus_1 (α:=α) (n + 1) m)
+                have h : p.equiv.symm (b, c) = p.equiv.symm
+                  (restrict₂ h1 (compapp₃ b ω a), c) := by {
+                    congr
+                    unfold compapp₃
+                    ext ⟨val,prop⟩
+                    simp only [mem_setOf_eq] at prop
+                    simp only [mem_setOf_eq, restrict₂, Set.restrict_apply, and_self, ↓reduceDIte,
+                      prop]
+                  }
+                conv => rhs; arg 1; apply h.symm
+                generalize p.1.symm (b, c) = d
+                unfold compapp₃ compapp compose' compose blowup
+                ext ⟨val,prop⟩
+                simp only [mem_setOf_eq] at prop
+                simp only [mem_setOf_eq, Set.restrict_apply, mem_singleton_iff, eq_mpr_eq_cast]
+                simp only [show val <= n + 1 + (m + 1) + 1 by omega, and_true, Int.reduceNeg, id_eq,
+                  Int.Nat.cast_ofNat_Int]
+                by_cases hn : n+1 < val
+                simp only [hn, ↓reduceDIte, Int.reduceNeg, show ¬val <= n by omega]
+                simp only [hn, ↓reduceDIte, Int.reduceNeg, show val <= n +1 by omega]
+              }
+          rw [h]
+          }
+        rw [<- hm g]
+
+        conv => lhs; tactic => {
+          unfold FiniteCompKernelNat
+          rw [Kernel.lintegral_compProd']
+          apply Measurable.comp'
+          exact hf
+          unfold compose'
+          apply Measurable.comp'
+          exact measurable_restrict {k | k ≤ n + (m + 1 + 1) + 1}
+          unfold compose
+          apply measurable_pi_lambda
+          intro a
+          split_ifs
+          apply measurable_pi_apply
+          apply measurable_const
+          apply measurable_const
+        }
+        congr
+        ext b
+        unfold g
+        simp only
+        have hnn : (n + (m + 1) + 1) = (n + 1 + m + 1) := by omega
+        congr 1 <;> try rw [hnn]
+        conv => lhs; arg 2; apply ProdLikeM.insert_m_apply_inv
+        conv => rhs; arg 2; apply ProdLikeM.insert_m_apply_inv
+        simp only [coe_setOf, mem_setOf_eq, eq_mp_eq_cast, id_eq, eq_mpr_eq_cast, restrict₂]
+        congr 1 <;> try rw [hnn]
+        ·
+          refine hfunext ?_ ?_
+          rw [show n+ (m+1+1) = n+1+(m+1) by ring]
+          intro a a' haa'
+          obtain ⟨val, property⟩ := a
+          obtain ⟨val', property'⟩ := a'
+          have h: val=val' := by {
+            refine (Subtype.heq_iff_coe_eq ?_).mp haa'
+            intro x; ring_nf
+          }
+          simp [compapp, compose', compose, blowup]
+          subst h
+          by_cases h : val <= n
+          · simp [h, show val <= n+1 by omega]
+          · by_cases h' : val = n+1
+            · subst h'
+              simp only [add_le_iff_nonpos_right, nonpos_iff_eq_zero, one_ne_zero, ↓reduceDIte,
+                le_refl, cast_eq, heq_eq_eq]
+            · simp [h, h', show ¬val <= n+1 by omega,
+                show val <= n+ (m+1) + 1 by omega,
+                show n < val by omega,
+                ]
+        ·
+          {
+          refine hfunext ?_ ?_
+          · rw [show n+ (m+1) + 1 + 1 = n+1+m+1+1 by omega]
+          · intro a a' haa'
+            simp only [coe_setOf, mem_setOf_eq, heq_eq_eq]
+            congr
+            conv => lhs; lhs; apply ProdLikeM.ge_n_insert_m_plus_1_apply_inv
+            conv => rhs; lhs; apply ProdLikeM.ge_n_insert_m_plus_1_apply_inv
+            ext ⟨val,prop⟩
+            simp only [mem_setOf_eq] at prop
+            simp only [mem_setOf_eq, compose', coe_setOf, Set.restrict_apply, compose, restrict₂,
+              compapp, lt_add_iff_pos_right, zero_lt_one, add_le_add_iff_right,
+              le_add_iff_nonneg_right, zero_le, and_self, ↓reduceDIte, mem_singleton_iff, blowup,
+              eq_mpr_eq_cast]
+            have h2 : val <= n + 1 + (m + 1) + 1 := by omega
+            simp only [prop, and_true, h2]
+            by_cases h : val <= n
+            · simp only [Nat.not_lt.mpr h, ↓reduceDIte, h, false_and,
+                dite_eq_ite]
+              by_cases h' : val <= n+1
+              · simp only [Nat.not_lt.mpr h', ↓reduceDIte, h', ↓reduceIte]
+              · exfalso; omega
+            · simp only [show n < val by exact Nat.gt_of_not_le h, ↓reduceDIte, true_and, h]
+              by_cases h' : val <= n+(m+1+1) <;> by_cases h'' : val <= n+1
+              · have h''' : val = n + 1 := by omega
+                subst h'''
+                simp only [add_le_add_iff_left, le_add_iff_nonneg_left, zero_le, ↓reduceDIte,
+                  lt_self_iff_false, le_refl, cast_eq]
+              · simp only [h', ↓reduceDIte, Nat.gt_of_not_le h'',
+                  show val <= n + 1 + (m + 1) by omega, and_self,
+                  show val <= n + (m + 1) + 1 by omega, Int.reduceNeg, id_eq, Int.Nat.cast_ofNat_Int]
+              · exfalso; omega
+              · have h''' : val = (n+(m+1+1)+1) := by omega
+                subst h'''
+                simp only [add_le_iff_nonpos_right, nonpos_iff_eq_zero, one_ne_zero, ↓reduceDIte,
+                  cast_eq, add_lt_add_iff_right, lt_add_iff_pos_right, add_pos_iff, zero_lt_one,
+                  or_true, or_self, show ¬(n + (m + 1 + 1) + 1) <= n + 1 + (m + 1) by omega,
+                  and_false]
+                symm
+                rw [cast_eq_iff_heq]
+                exact haa'.symm
+          }
+        · {
+          unfold g
+          simp only [coe_setOf, mem_setOf_eq]
+          apply kernel_measurability
+          · apply measurable_pi_lambda
+            intro j
+            apply Measurable.eval
+            apply Measurable.comp'
+            apply MeasurableEquiv.measurable
+            apply Measurable.prod <;> simp only
+            · apply Measurable.comp'
+              apply measurable_compapp_snd ω
+              apply measurable_pi_apply
+            · apply measurable_restrict₂
+          · unfold uncurry
+            simp only
+            apply Measurable.comp' hf
+            refine measurable_pi_iff.mpr ?_
+            intro i
+            unfold compose' compose
+            simp only [mem_setOf_eq, eq_mpr_eq_cast, Set.restrict_apply, dite_eq_ite]
+            split_ifs
+            apply Measurable.eval
+            apply Measurable.comp'
+            apply MeasurableEquiv.measurable
+            apply Measurable.prod <;> simp only
+            apply Measurable.comp'
+            apply measurable_restrict₂
+            exact measurable_fst
+            exact measurable_snd
+            apply Measurable.eval
+            apply Measurable.comp'
+            apply measurable_compapp_snd ω
+            apply Measurable.eval
+            exact measurable_fst
+            exact measurable_const
+          }
+      }
+    }
+
+lemma mem_congr_heq
+  (A : Set α)
+  (B : Set β)
+  (x : α)
+  (y : β)
+  (h : α = β)
+  (hxy : HEq x y)
+  (hAB: HEq A B)
+  : x ∈ A <-> y ∈ B := by {
+    subst h
+    simp_all only [heq_eq_eq]
+  }
+
+@[simp]
+lemma kernel_slice_integral'
+  {α : ℕ -> Type*}
+  [∀n, MeasurableSpace (α n)]
+  [∀n, Inhabited (α n)]
+  (K : ∀n, Kernel (⇑α {k|k ≤ n}) (α (n+1)))
+  [∀n, IsMarkovKernel (K n)]
+  (A : ∀n, Set (⇑α {k|k ≤ n}))
+  (hA : ∀n, MeasurableSet (A n))
+  (n m : ℕ)
+  (ω : ⇑α {k | k ≤ n})
+  :
+  kernel_slice (FiniteCompKernelNat K n (m + 1)) (A (n + m + 2)) ω =
+    ∫⁻ (ω' : α (n + 1)), kernel_slice (FiniteCompKernelNat K (n + 1) m)
+      (A (n + 1 + m + 1)) (compapp ω ω') ∂(K n) ω
+      := by {
+        unfold kernel_slice
+        rw [<- setLIntegral_one, <- lintegral_indicator]
+        simp only [coe_setOf, mem_setOf_eq]
+        simp_rw [<- setLIntegral_one]
+        conv => rhs; rhs; intro a; tactic => {
+          rw [<- lintegral_indicator]
+          apply ProdLikeM.slice_measurable
+          apply hA
+        }
+        let f : _ -> ℝ≥0∞ := (A (n + (m + 1) + 1)).indicator 1
+        have hf : Measurable f := by {
+          unfold f
+          apply Measurable.indicator
+          exact measurable_one
+          apply hA
+        }
+        conv => rhs; rhs; intro a; rhs; intro b; tactic => {
+          suffices  _ = f (compapp₃ b ω a) from this
+          simp only [indicator_apply, coe_setOf, mem_setOf_eq, Pi.one_apply, f]
+          congr 1
+          unfold ProdLikeM.slice
+          simp only [mem_setOf_eq, eq_iff_iff]
+          conv => lhs; rhs; apply ProdLikeM.insert_m_apply_inv
+          simp only [coe_setOf, mem_setOf_eq, eq_mp_eq_cast, id_eq, eq_mpr_eq_cast]
+          -- generalize_proofs h h'
+          -- let x : (j : { x // x ≤ n + 1 + (m + 1) }) → α ↑j
+          --   := fun j ↦ if h_1 : ↑j ≤ n + 1 then compapp ω a ⟨↑j, h j h_1⟩ else b ⟨↑j, h' j h_1⟩
+          have hn : n+1+m+1 = n+(m+1)+1 := by omega
+          apply mem_congr_heq <;> try rw [hn]
+          apply hfunext
+          rw [show n+1+(m+1) = n+(m+1)+1 by omega]; rfl
+          intro i j hij
+          have h : (i : ℕ) = j := by {
+            refine (Subtype.heq_iff_coe_eq ?_).mp hij
+            intro a; simp only [mem_setOf_eq]; omega
+          }
+          obtain ⟨i,hi⟩ := i
+          obtain ⟨j,hj⟩ := j
+          simp only at h
+          subst h
+          simp only [mem_setOf_eq, heq_eq_eq]
+          unfold compapp
+          simp only [Set.restrict_apply, mem_setOf_eq]
+          unfold compose blowup compapp₃
+          simp only [mem_setOf_eq, mem_singleton_iff, eq_mpr_eq_cast, Set.restrict_apply]
+          split_ifs <;> try rfl
+          all_goals try {rename_i h; obtain ⟨x,y⟩ := h; exfalso; omega}
+          rename_i h1 h2 h3
+          simp at h2
+          exfalso
+          apply h2
+          constructor
+          omega
+          omega
+          rename_i h1 h2 h3
+          exfalso
+          apply h1
+          constructor
+          omega
+          omega
+        }
+        conv => lhs; rhs; intro b; tactic => {
+          suffices _ = f (compose' b ω) by exact this
+          simp only [indicator_apply, coe_setOf, mem_setOf_eq, Pi.one_apply, f]
+          congr 1
+          unfold ProdLikeM.slice
+          simp only [mem_setOf_eq, eq_iff_iff]
+          conv => lhs; rhs; apply ProdLikeM.insert_m_apply_inv
+          simp only [coe_setOf, mem_setOf_eq, eq_mp_eq_cast, id_eq, eq_mpr_eq_cast]
+          -- generalize_proofs h h'
+          -- let x : (j : { x // x ≤ n + 1 + (m + 1) }) → α ↑j
+          --   := fun j ↦ if h_1 : ↑j ≤ n + 1 then compapp ω a ⟨↑j, h j h_1⟩ else b ⟨↑j, h' j h_1⟩
+          have hn : n+m+2 = n+(m+1)+1 := by omega
+          apply mem_congr_heq <;> try rw [hn]
+          apply hfunext
+          rw [show n+(m+1+1) = n+(m+1)+1 by omega]; rfl
+          intro i j hij
+          have h : (i : ℕ) = j := by {
+            refine (Subtype.heq_iff_coe_eq ?_).mp hij
+            intro a; simp only [mem_setOf_eq]; omega
+          }
+          obtain ⟨i,hi⟩ := i
+          obtain ⟨j,hj⟩ := j
+          simp only at h
+          subst h
+          simp only [mem_setOf_eq, heq_eq_eq]
+          unfold compose' compose
+          simp only [mem_setOf_eq, Set.restrict_apply]
+          split_ifs <;> try rfl
+          all_goals exfalso
+          rename_i h1
+          obtain ⟨x,y⟩ := h1
+          omega
+          rename_i h1
+          apply h1
+          constructor
+          omega
+          omega
+        }
+        apply kernel_slice_integral''
+        exact hf
+        apply ProdLikeM.slice_measurable
+        apply hA
+      }

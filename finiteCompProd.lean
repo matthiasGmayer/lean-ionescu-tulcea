@@ -25,8 +25,6 @@ open ProbabilityMeasure Measure ProductLike
 open ProbabilityTheory
 open IndexedFamilies
 
--- @[simps (config := .asFn)]
-
 
 def FiniteCompMeasureKernelNat
   {α : ℕ -> Type*}
@@ -37,76 +35,19 @@ def FiniteCompMeasureKernelNat
   : (n : ℕ) -> Measure (⇑α {k|k <= n})
   | 0 => convert_measure μ
   | m + 1 => compProd' (FiniteCompMeasureKernelNat μ K m) (K m)
-    (p := ProdLikeM.insert_n_plus_1 m)
-
--- def FiniteCompKernelNat0
---   {α : ℕ -> Type*}
---   [∀m, MeasurableSpace (α m)]
---   (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
---   : (n : ℕ) -> Kernel (α 0) (∀k : {k | 0 < k ∧ k <= n+1}, α k)
---   | 0 => convert_kernel (K 0)
---   | m + 1 =>
---   let p : ProdLikeM ((k : ↑{k | k ≤ m + 1}) → α ↑k) (α 0) ((k : ↑{k | 0 < k ∧ k ≤ m + 1}) → α ↑k)
---   := by {
---     exact prod_equiv_2 m
---   }
---   -- let q : ProdLikeM ((k : ↑{k | 0 < k ∧ k ≤ m + 1 + 1}) → α ↑k) ((k : ↑{k | 0 < k ∧ k ≤ m + 1}) → α ↑k) (α (m + 1 + 1))
---   -- := by {
---   --   exact?
---   -- }
---   Kernel.compProd' (FiniteCompKernelNat0 K m) (K (m+1)) (p := p)
-
-def Kernel_to_unique [MeasurableSpace α] [MeasurableSpace β]
-  [Unique β]
-  : Kernel α β
-  := Kernel.deterministic (default : α -> β) (measurable_const' fun _ ↦ congrFun rfl)
-
--- def FiniteCompKernelNat
---   {α : ℕ -> Type*}
---   [∀m, MeasurableSpace (α m)]
---   (K : ∀(m : ℕ), Kernel (∀k : {k|k <= m}, α k) (α (m+1)))
---   (m : ℕ) (n : ℕ)
---   : Kernel (∀k: {k | k <= m}, α k) (∀k : {k | m < k ∧ k <= n+1}, α k)
---   := by {
---     by_cases hle : n < m
---     let hU : Unique ((k : ↑{k | m < k ∧ k ≤ n + 1}) → α ↑k) := by {
---       rw [show {k | m < k ∧ k <= n + 1} = ∅ by ext;simp;omega]
---       apply Pi.uniqueOfIsEmpty
---     }
---     exact Kernel_to_unique
---     by_cases h : n = m
---     subst h
---     exact convert_kernel (K n)
---     have hge : n > m := by omega
---     let n' := n - 1
---     have hn' : n' + 1 = n := by omega
---     let p : ProdLikeM _ _ _
---     := ⟨equiv_4 (α := α) m (n'+1) (by omega)⟩
---     let K' := K n
---     -- rw [<- hn'] at K'
---     -- #check  Kernel.compProd' (FiniteCompKernelNat K m n') K' (p := p)
---     let q : ProdLikeM ((k : ↑{k | m < k ∧ k ≤ n + 1}) → α ↑k) ((k : ↑{k | m < k ∧ k ≤ n' + 1}) → α ↑k) (α (n' + 1 + 1))
---       := by {
---         rw [hn']
---         exact ⟨equiv_5 m (n) (by {omega})⟩
---       }
---     rw [<- hn'] at K'
---     exact Kernel.compProd' (FiniteCompKernelNat K m n') K' (p := p) (q := q)
---       (F' := (∀k : {k | m < k ∧ k <= n+1}, α k))
---   }
+    -- (p := ProdLikeM.insert_n_plus_1 m)
 
 def FiniteCompKernelNat
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
   (K : ∀(m : ℕ), Kernel (⇑α {k|k <= m}) (α (m+1)))
-  (n : ℕ) (m : ℕ)
-  : Kernel (⇑α {k | k <= n}) (⇑α {k | n < k ∧ k <= n+m+1})
-  :=
-  match m with
+  (n : ℕ)
+  : (m : ℕ) -> Kernel (⇑α {k | k <= n}) (⇑α {k | n < k ∧ k <= n+m+1})
   | 0 => convert_kernel (K n)
   | m+1 =>
     Kernel.compProd' (FiniteCompKernelNat K n m) (K (n + m + 1))
-      (p := ProdLikeM.insert_m (α := α) n (m+1))
+      -- (p := ProdLikeMIn.insert_m (α := α) n (m+1))
+      -- (q := ProdLikeM.ge_n_insert_m_plus_1 (α := α) n (m+1))
 
 
 instance compProd'_stays_probability
@@ -157,7 +98,7 @@ instance Kernel.compProd'_stays_markov
   (L : Kernel γ δ)
   [IsMarkovKernel K]
   [IsMarkovKernel L]
-  : IsMarkovKernel (Kernel.compProd' K L : Kernel α ε) := by {
+  : IsMarkovKernel (Kernel.compProd' K L) := by {
     -- rw [compProd'_def]
     rw [show Kernel.compProd' K L =
     change_right (K ⊗ₖ change_left L ProdLikeM.equiv) ProdLikeM.equiv.symm from rfl]
@@ -286,7 +227,7 @@ lemma kernel_application_measurable
   [p : ProdLikeM γ α β]
   (B : Set γ)
   (hB : @MeasurableSet _ mγ B)
-  : Measurable (kernel_slice K B (p := p)) := by {
+  : Measurable (kernel_slice K B) := by {
     unfold kernel_slice ProdLikeM.slice
     let B' : Set (α × β) := p.equiv '' B
     have hB' : MeasurableSet B' := by {
@@ -403,7 +344,7 @@ lemma compProd'_fst_is_measure [mα : MeasurableSpace α] [mβ : MeasurableSpace
 [IsProbabilityMeasure μ] (K : Kernel α β) [MeasurableSpace γ]
 [p : ProdLikeM γ α β]
   [mK : IsMarkovKernel K]
-  : (compProd' μ K (p := p)).map p.fst = μ := by {
+  : (compProd' μ K).map p.fst = μ := by {
     rw [show p.fst = (Prod.fst ∘ p.equiv) by rfl]
     ext s hs
     have hf : Measurable (Prod.fst ∘ p.equiv) := by {
@@ -433,18 +374,16 @@ lemma comp_preimage (f : α -> β) (g : γ -> α) : g ⁻¹' (f ⁻¹' t) = (f �
 lemma restrict_equiv_prod_fst
   (α : ℕ -> Type*)
   [∀m, MeasurableSpace (α m)]
-  -- [∀m, Inhabited (α m)]
   (n: ℕ)
-  : restrict₂ (π := α) (le_to_subset <| Nat.le_add_right n 1) ∘ ⇑ProdLikeM.equiv.symm
-    = Prod.fst
+  : restrict₂ (π := α) (le_to_subset <| Nat.le_add_right n 1)
+    ∘ ProdLikeM.equiv.symm
+    = (Prod.fst (α := ⇑α {k | k <= n}) (β := α (n+1)))
     := by {
-      ext x y
-      simp
+      ext x : 1
       unfold ProdLikeM.equiv
-      unfold ProdLikeM.insert_m
-      unfold MeasurableEquiv.insert_m
-      unfold MeasurableEquiv.pi_equiv
-      unfold Equiv.pi_equiv
+      simp
+      conv => lhs; rhs; apply ProdLikeM.insert_n_plus_1_apply_inv
+      ext y
       simp [show ↑y <= n from y.2]
       rfl
     }
@@ -454,7 +393,7 @@ lemma restrict_prod_fst
   -- [∀m, Inhabited (α m)]
   (n: ℕ)
   : restrict₂ (π := α) (le_to_subset <| Nat.le_add_right n 1)
-    = ProdLikeM.fst
+    = (ProdLikeM.insert_n_plus_1 _).fst
     := by rfl
 
 lemma KernelLift
@@ -491,7 +430,7 @@ lemma KernelLift
         unfold FiniteCompMeasureKernelNat
         conv => lhs; arg 1; {
           apply compProd'_fst_is_measure
-            (p := ProdLikeM.insert_n_plus_1 m)
+            -- (p := ProdLikeM.insert_n_plus_1 m)
             (FiniteCompMeasureKernelNat μ K m) (K m)
         }
         match m with
@@ -600,6 +539,26 @@ def blowup
     rw [j.2]
     exact a
   }
+@[measurability]
+lemma measurable_blowup
+  {α : I -> Type*}
+  [mα : ∀i, MeasurableSpace (α i)]
+  {i : I}
+  : Measurable (blowup (α := α) (i:=i)) := by {
+    unfold blowup
+    simp
+    generalize_proofs h
+    have h' : ∀j : ({i} : Set I), HEq (mα i) (mα j) := by aesop
+    have h: ∀a, ∀j, cast (h j) a = MeasurableEquiv.cast (h j) (h' j) a := by {
+      intro a j
+      rfl
+    }
+    simp_rw [h]
+    apply measurable_pi_lambda
+    intro a
+    generalize_proofs h1 h2
+    exact MeasurableEquiv.measurable (MeasurableEquiv.cast h1 h2)
+  }
 
 def compapp
   {α : I -> Type*} {J L : Set I}
@@ -621,7 +580,27 @@ lemma compapp_apply
     simp [compapp, compose, blowup, *]
   }
 
+@[measurability]
 theorem measurable_compose
+  {α : I -> Type*} {J K : Set I}
+  [∀i, Inhabited (α i)]
+  [∀n, MeasurableSpace (α n)]
+  : Measurable fun ω : (⇑α J × ⇑α K) => compose ω.1 ω.2 := by {
+    unfold compose
+    apply measurable_pi_lambda
+    intro i
+    by_cases hJ : i ∈ J
+    simp [hJ]
+    apply Measurable.eval
+    apply measurable_fst
+    by_cases hK : i ∈ K
+    simp [hJ, hK]
+    apply Measurable.eval
+    apply measurable_snd
+    simp [hJ, hK]
+  }
+@[measurability]
+theorem measurable_compose_snd
   {α : I -> Type*} {J K : Set I}
   [∀i, Inhabited (α i)]
   [∀n, MeasurableSpace (α n)]
@@ -636,4 +615,176 @@ theorem measurable_compose
     simp [hJ, hK]
     apply measurable_pi_apply
     simp [hJ, hK]
+  }
+@[measurability]
+theorem measurable_compose'
+  {α : I -> Type*} {J K L : Set I}
+  [∀i, Inhabited (α i)]
+  [∀n, MeasurableSpace (α n)]
+  : Measurable fun (ω : ⇑α J × ⇑α K) => (compose' (L:=L) (α := α) ω.1 ω.2) := by {
+    unfold compose'
+    apply Measurable.comp'
+    exact measurable_restrict L
+    exact measurable_compose
+  }
+@[measurability]
+theorem measurable_compose'_fst
+  {α : I -> Type*} {J K L : Set I}
+  [∀i, Inhabited (α i)]
+  [∀n, MeasurableSpace (α n)]
+  (ω₂ : (∀i:K, α i))
+  : Measurable fun x => (compose' (L:=L) (α := α) (J:=J) x ω₂) := by {
+    -- let f := fun (x : ⇑α J × ⇑α K) => (compose' (L:=L) (α := α) x.1 x.2)
+    suffices Measurable λ x => (uncurry compose') (x, ω₂) by exact this
+    apply Measurable.comp'
+    exact measurable_compose'
+    apply Measurable.prod <;> simp only
+    exact measurable_id
+    exact measurable_const
+  }
+
+@[measurability]
+lemma measurable_compapp_snd
+  {α : I -> Type*} {J L : Set I}
+  [∀i, Inhabited (α i)]
+  [∀n, MeasurableSpace (α n)]
+  (ω₁ : (∀i:J, α i))
+  (i : I)
+  : Measurable (compapp (L:=L) (i:=i) ω₁) := by {
+    unfold compapp
+    apply Measurable.comp'
+    exact measurable_restrict L
+    apply Measurable.comp'
+    exact measurable_compose_snd ω₁
+    apply measurable_blowup
+  }
+
+def compose₃
+  {α : I -> Type*} {J K L M : Set I}
+  [∀i, Inhabited (α i)]
+  (ω₁ : (∀i:J, α i))
+  (ω₂ : (∀i:K, α i))
+  (ω₃ : (∀i:L, α i))
+  := M.restrict fun j =>
+    if h : j ∈ J then
+      ω₁ ⟨j,h⟩
+    else if h: j ∈ K then
+      ω₂ ⟨j,h⟩
+    else if h: j ∈ L then
+      ω₃ ⟨j,h⟩
+    else
+      default
+
+def compapp₃
+  {α : I -> Type*} {J K M : Set I}
+  [∀i, Inhabited (α i)]
+  (ω₁ : (∀i:J, α i))
+  (ω₂ : (∀i:K, α i))
+  {i : I}
+  (ω₃ : α i)
+  := M.restrict fun j =>
+    if h : j ∈ J then
+      ω₁ ⟨j,h⟩
+    else if h: j ∈ K then
+      ω₂ ⟨j,h⟩
+    else if h: j = i then
+      cast (by aesop) ω₃
+    else
+      default
+
+def restrict' {α : I -> Type*}
+  [∀i, Inhabited (α i)]
+  {J : Set I} (ω : (∀i:J, α i))
+  (K : Set I)
+  (k : K)
+  : α k
+  := if h : (k : I) ∈ J then
+    ω ⟨k,h⟩
+  else default
+
+-- @[simp]
+lemma compose₃_heq
+  {α : I -> Type*}
+  {J K L M : Set I}
+  {J' K' L' M' : Set I}
+  [∀i, Inhabited (α i)]
+  (hJ : J=J')
+  (hK : K=K')
+  (hL : L=L')
+  (hM : M=M')
+  : HEq
+    (compose₃ (α := α) (J:=J) (K:=K) (L:=L) (M:=M))
+    (compose₃ (α := α) (J:=J') (K:=K') (L:=L') (M:=M')) := by {
+      subst hJ hK hL hM
+      rfl
+    }
+
+lemma compapp₃_heq
+  {α : I -> Type*}
+  {J K M : Set I}
+  {J' K' M' : Set I}
+  (i i' : I)
+  [∀i, Inhabited (α i)]
+  (hJ : J=J')
+  (hK : K=K')
+  (hM : M=M')
+  (hi : i = i')
+  : HEq
+    (compapp₃ (α := α) (J:=J) (K:=K) (M:=M) (i:=i))
+    (compapp₃ (α := α) (J:=J') (K:=K') (M:=M') (i:=i')) := by {
+      subst hJ hK hM hi
+      rfl
+    }
+
+lemma compose'_compapp_compapp₃
+  {α : I -> Type*}
+  {J K L M : Set I}
+  (hL : J ∪ K ⊆ L)
+  [∀i, Inhabited (α i)]
+  (ω₁ : (∀i:J, α i))
+  (ω₂ : (∀i:K, α i))
+  {i : I}
+  (hi : i ∈ L)
+  (ω₃ : α i)
+  : compose' ω₁ (compapp (L:=L) ω₂ ω₃) = compapp₃ (M:=M) ω₁ ω₂ ω₃ := by {
+    have hJ : J ⊆ L := by aesop
+    have hK : K ⊆ L := by aesop
+    ext x
+    simp [compose', compapp₃, compose, compapp]
+    by_cases h : (x : I) ∈ J
+    <;> by_cases h' : (x : I) ∈ K
+    <;> by_cases h'' : (x : I) = i
+    <;> simp [h,h']
+    -- aesop
+    intro g; exfalso; apply g; exact hK h'
+    intro g; exfalso; apply g; exact hK h'
+    have g : (x : I) ∈ L := by aesop
+    simp [g, h'', hi]
+    rfl
+    simp only [↓reduceDIte, ite_self, h'']
+  }
+
+@[measurability]
+lemma measurable_compapp₃_fst
+  {α : I -> Type*}
+  {J K M : Set I}
+  [∀i, Inhabited (α i)]
+  [∀n, MeasurableSpace (α n)]
+  (ω₂ : (∀i:K, α i))
+  {i : I}
+  (ω₃ : α i)
+  : Measurable fun ω₁ => (compapp₃ (M:=M) (J:=J) (α := α) ω₁ ω₂ ω₃) := by {
+    unfold compapp₃
+    apply Measurable.comp'
+    exact measurable_restrict M
+    apply measurable_pi_lambda
+    intro j
+    by_cases hJ: j ∈ J
+    · simp only [hJ, ↓reduceDIte]
+      apply measurable_pi_apply
+    · by_cases hK: j ∈ K
+      · simp only [hJ, ↓reduceDIte, hK, measurable_const]
+      · by_cases hi: j = i
+        · simp only [hJ, ↓reduceDIte, hK, measurable_const]
+        · simp only [hJ, ↓reduceDIte, hK, hi, measurable_const]
   }
