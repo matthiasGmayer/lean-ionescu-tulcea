@@ -95,7 +95,8 @@ def sContinuousFromAbove  : Prop :=
 
 def sContinuousInEmpty  : Prop :=
   ∀⦃A : ℕ → Set α⦄, (∀ i, (A i) ∈ S) -> (μ (A 0) < ∞) ->
-  (Tendsto A atTop (𝓝 ∅)) ->
+  (hmono : Antitone A) ->
+  (⋂n, A n = ∅) ->
   Tendsto (λ n => μ (A n)) atTop (𝓝 0)
 
 include hAlg in

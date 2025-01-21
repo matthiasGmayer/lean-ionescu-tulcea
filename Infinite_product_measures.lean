@@ -106,7 +106,7 @@ def MeasureKernelSequenceContent
       have hnk : Nat.find hs <= k := by omega
       have hmk : Nat.find ht <= k := by omega
       have hnmk : Nat.find hsut <= k := by omega
-      rw [<- KernelLift μ K hnk, <- KernelLift μ K hmk, <- KernelLift μ K hnmk]
+      rw [<- Measure.finiteCompLift μ K hnk, <- Measure.finiteCompLift μ K hmk, <- Measure.finiteCompLift μ K hnmk]
       generalize_proofs gnm gn gm
       simp only [coe_setOf, mem_setOf_eq]
       repeat rw [Measure.map_apply]
@@ -145,6 +145,50 @@ def MeasureKernelSequenceContent
       exact (choose_spec hTnm).1
     })
 
+
+lemma MeasureKernelSequenceContent_cylinder_apply
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]
+  (μ : Measure (α 0))
+  [hμ : IsProbabilityMeasure μ]
+  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  [hK : ∀n, IsMarkovKernel (K n)]
+  {n : ℕ}
+  {s : Set _}
+  (hs : s ∈ cylinder_n α n)
+  : MeasureKernelSequenceContent μ K s = FiniteCompMeasureKernelNat μ K n (choose hs) := by {
+    have hs' : s ∈ cylinders α := by {
+      unfold cylinders
+      simp
+      exact ⟨n, hs⟩
+    }
+    unfold MeasureKernelSequenceContent
+    rw [AddContent.mk'_on_C]
+    simp only [show ∃ n, s ∈ cylinder_n α n from ⟨n, hs⟩, ↓reduceDIte, coe_setOf, mem_setOf_eq]
+    generalize_proofs h1 h2 h3
+    have hn : Nat.find h1 <= n := by
+      simp only [Nat.find_le_iff]
+      apply Exists.intro
+      · apply And.intro
+        · rfl
+        · simp_all only
+    rw [<- Measure.finiteCompLift μ K hn]
+    simp only [coe_setOf, mem_setOf_eq]
+    rw [Measure.map_apply]
+    congr
+    have h : {x|x<= Nat.find h1}.restrict ⁻¹' choose h2 = {x|x<=n}.restrict ⁻¹' choose h3 := by {
+      rw [(choose_spec h2).2, (choose_spec h3).2]
+    }
+    nth_rw 1 [show {x | x <= Nat.find h1}.restrict
+      = {x | x <= Nat.find h1}.restrict₂ (by simp only [setOf_subset_setOf];intros;omega)
+        ∘ {x | x <= n}.restrict from rfl] at h
+    rw [preimage_comp, restrict_preimage_equal_iff] at h
+    exact h
+    apply measurable_restrict₂
+    exact (choose_spec h2).1
+  }
+
 -- lemma seq_inf : Tendsto a atTop 0 :
 open Filter Topology
 
@@ -180,7 +224,7 @@ theorem measurable_partial_apply
     apply Measurable.comp' hf
     apply Measurable.comp'
     exact measurable_restrict K
-    apply measurable_compose
+    exact measurable_compose_snd ω
   }
 
 def partial_apply_kernel_n {α : ℕ -> Type*} {n:ℕ}
@@ -206,10 +250,15 @@ lemma prob_method_integral [MeasurableSpace α] (f : α -> ℝ≥0∞) (μ : Mea
     rw [h] at hpos
     exact (lt_self_iff_false 0).mp hpos
 }
-lemma test (f : I -> ℝ≥0∞) (hf : ∀i, f i >= c)
-  : (⨅i, f i) >= c := by {
-    exact le_iInf hf
-  }
+-- lemma test (f : I -> ℝ≥0∞) (hf : ∀i, f i >= c)
+--   : (⨅i, f i) >= c := by {
+--     exact le_iInf hf
+--   }
+
+-- lemma iInf_fun {α : I -> Type*} {f : I -> ℝ≥0∞} {g : I -> I}
+--   : ⨅i, f i <= ⨅i, f (g i)  := by {
+--     exact le_iInf_comp f g
+--   }
 
 theorem MeasureCompKernelNatContentSAdditive
   {α : ℕ -> Type*}
@@ -227,17 +276,97 @@ theorem MeasureCompKernelNatContentSAdditive
         (∀n, B n ⊇ B (n+1)) ->
         ⋂n, B n = ∅ ->
         Tendsto (fun n => MeasureKernelSequenceContent μ K (B n)) atTop (𝓝 0) by {
-          sorry
+          intro A hA hT hmono hempsect
+          unfold cylinders at hA
+          simp only [mem_iUnion] at hA
+          let f n := Nat.find (hA n)
+          have hf n := Nat.find_spec (hA n)
+          simp_rw [show ∀n, Nat.find (hA n) = f n by intros; rfl] at hf
+          have hfmin n {m} (hm : m < f n) : A n ∉ cylinder_n α m := Nat.find_min (hA n) hm
+          have hf : Monotone f := by {
+            apply monotone_nat_of_le_succ
+            intro n
+            by_contra h
+            push_neg at h
+            have hcyl : cylinder_n α (f (n +1)) ⊆ cylinder_n α (f n) := by {
+              apply cylinder_subset
+              exact Nat.le_of_succ_le h
+            }
+            specialize hfmin n h
+            specialize hf n
+            apply hfmin
+          }
         }
+      sorry
       intro B hB hmono hempsect
       by_contra hcontra
       let A n := choose (hB n)
+      have hBmono n m : (hnm : n <= m) -> B m ⊆ B n := by {
+        intro hnm
+        let k := m-n
+        have hmnk : m = n+k := by omega
+        rw [hmnk]
+        induction k with
+        | zero => rfl
+        | succ k hk=> {
+          calc B (n + (k + 1)) ⊆ B (n + k) := hmono (n + k)
+          _ ⊆ B n := hk
+        }
+      }
+      have hABel n x : x ∈ A n <-> ∃y, {k|k<=n}.restrict y = x ∧ y ∈ B n := by {
+        obtain ⟨_, h⟩ := choose_spec (hB n)
+        rw [<- h]
+        unfold A
+        simp only [coe_setOf, mem_setOf_eq, mem_preimage]
+        constructor <;> intro g
+        · have hy: ∃y, {k|k<=n}.restrict y = x := by apply Subtype.exists_pi_extension
+          obtain ⟨y, hy⟩ := hy
+          use y
+          constructor
+          · exact hy
+          · rw [hy]
+            assumption
+        · obtain ⟨y, hy⟩ := g
+          rw [<- hy.1]
+          exact hy.2
+      }
       have hA n : MeasurableSet (A n) := (choose_spec (hB n)).1
-      have hAB n : {k|k<=n}.restrict ⁻¹' A n = B n := sorry
+      have hAB n : {k|k<=n}.restrict ⁻¹' A n = B n := by {
+        ext x
+        unfold A
+        obtain ⟨_, h⟩ := choose_spec (hB n)
+        constructor <;> intro h'
+        · rw [<- h]
+          exact h'
+        · rw [<- h] at h'
+          exact h'
+      }
       have hABμ n: MeasureKernelSequenceContent μ K (B n)
-        = FiniteCompMeasureKernelNat μ K n (A n) := sorry
+        = FiniteCompMeasureKernelNat μ K n (A n) := by {
+          rw [MeasureKernelSequenceContent_cylinder_apply μ K (hB n)]
+        }
+      have hcontmono : Antitone fun n => (MeasureKernelSequenceContent μ K) (B n) := by {
+        intro m n hmn
+        simp only
+        refine addContent_mono ?_ ?_ ?_ (hBmono m n hmn)
+        exact SetAlgebraIsSetSemiRing (cylinders_SetAlgebra α)
+        unfold cylinders
+        simp only [mem_iUnion]
+        use n
+        exact hB n
+        unfold cylinders
+        simp only [mem_iUnion]
+        use m
+        exact hB m
+      }
 
-      have hinf : ⨅ n, MeasureKernelSequenceContent μ K (B n) > 0 := sorry
+      have hinf : ⨅ n, MeasureKernelSequenceContent μ K (B n) > 0 := by {
+        by_contra h
+        simp only [gt_iff_lt, not_lt, nonpos_iff_eq_zero] at h
+        have h' := tendsto_atTop_iInf hcontmono
+        rw [h] at h'
+        contradiction
+      }
 
       suffices ∃ω, ∀n, ({k|k<=n}.restrict ω) ∈ A (n) by {
         obtain ⟨ω,hω⟩ := this
@@ -259,7 +388,6 @@ theorem MeasureCompKernelNatContentSAdditive
 
 
       have hAmem n ω : ω ∈ A (n + 1) -> {k|k<=n}.restrict₂ (by simp; omega) ω ∈ A n := by {
-        sorry
         unfold A
         generalize_proofs h1 h2 h3
         intro h
@@ -291,17 +419,17 @@ theorem MeasureCompKernelNatContentSAdditive
       }
 
       have hf n ω : f n 0 ω > 0 -> ω ∈ A n := by {
-        sorry
         unfold f
         simp
         intro h
-        rw [show kernel_slice (Q n n) (A (n + 1)) (p := p n 0) ω = ((Q n n) ω)
+        rw [show kernel_slice (Q n 0) (A (n + 1)) (p := p n 0) ω = ((Q n 0) ω)
           ((p n 0).slice (A (n + 1)) ω) from rfl] at h
         rw [show (p n 0).slice (A (n + 1)) ω = {b | (p n 0).equiv.symm (ω, b) ∈ A (n + 1)} from rfl] at h
         simp at h
         have h : {b | (p n 0).equiv.symm (ω, b) ∈ A (n + 1)} ≠ ∅ := by {
           by_contra hh
-          simp only [Nat.add_zero, coe_setOf, mem_setOf_eq] at hh -- Why do i need this
+          simp only [Nat.reduceAdd, coe_setOf, mem_setOf_eq, ProdLikeM.insert_m_apply_inv,
+            eq_mp_eq_cast, id_eq, eq_mpr_eq_cast] at hh
           rw [hh] at h
           simp at h
         }
@@ -313,9 +441,8 @@ theorem MeasureCompKernelNatContentSAdditive
         generalize_proofs hgg at hAmem
         rw [show restrict₂ hgg ω' = ω by unfold ω'; {
           ext i
-          simp
-          unfold ProdLikeM.equiv
-          unfold p equiv_4
+          simp only [mem_setOf_eq, restrict₂, coe_setOf, Nat.reduceAdd,
+            ProdLikeM.insert_m_apply_inv, eq_mp_eq_cast, id_eq, eq_mpr_eq_cast]
           let hi : (i : ℕ) <= n := i.2
           simp [hi]
           rfl
@@ -324,7 +451,6 @@ theorem MeasureCompKernelNatContentSAdditive
       }
 
       suffices ∃ω, ∀n, ⨅m, f n m ({k|k<=n}.restrict ω) > 0 by {
-        sorry
         obtain ⟨ω, hω⟩ := this
         use ω
         intro n
@@ -336,18 +462,36 @@ theorem MeasureCompKernelNatContentSAdditive
         exact hf n ({k | k ≤ n}.restrict ω) h
       }
 
-
-      -- suffices ∀n, ∃ω, ⨅m, f n m ω > 0 by {
-      --   let n : ℕ  := sorry
-      --   let ω := fun n => choose (this n)
-      --   -- use ω
-      -- }
-
       have hQ n m : IsMarkovKernel (Q n m) := by unfold Q; infer_instance
 
-      -- #check kernel_application_measurable
-      have fmono : ∀n, Antitone (f n) := by sorry
-      -- have fpos : ∀n m ω, f n m ω >= 0 := by simp [f, kernel_slice, Q]
+      have fmono : ∀n, Antitone (f n) := by {
+        intro n
+        intro m k hmk
+        unfold f kernel_slice Q
+        intro a
+        simp only
+        rw [<- Kernel.finiteCompLift μ K hmk]
+        rw [Kernel.map_apply, Measure.map_apply]
+        gcongr
+        unfold ProdLikeM.slice
+        intro x hx
+        simp only [coe_setOf, mem_setOf_eq] at hx
+        simp only [coe_setOf, mem_setOf_eq, preimage_setOf_eq]
+        rw [hABel]
+        rw [hABel] at hx
+        obtain ⟨y,hy⟩ := hx
+        use y
+        constructor
+        · rw [ show {k|k<= n + m+ 1}.restrict y
+            = {k|k<= n+m+1}.restrict₂ (by simp;intros;omega)
+              ({k'|k'<=n+k+1}.restrict y) from rfl]
+          rw [hy.1]
+          rfl
+        · exact hBmono (n + m + 1) (n+k+1) (by omega) hy.2
+        apply measurable_restrict₂
+        exact ProdLikeM.slice_measurable (p n m) (A (n + m + 1)) (hA (n + m + 1)) a
+        apply measurable_restrict₂
+      }
       have fone : ∀n m ω, f n m ω <= 1 := by intros; simp [f, kernel_slice, Q]; apply prob_le_one
       have hf n m : Measurable (f n m) := by apply kernel_application_measurable; apply hA
 
@@ -396,31 +540,37 @@ theorem MeasureCompKernelNatContentSAdditive
       have hf1 : ∀n m ω, f n (m+1) ω = ∫⁻ ω', f (n+1) m (compapp ω ω') ∂K n ω := by {
         intro n m ω
         unfold f Q
-        simp
-
-
-
-        -- conv => rhs; apply kernel_slice_integral
+        exact kernel_slice_integral' K A hA n m ω
       }
 
-      have hf1inf : ∀n ω, ⨅m, f n m ω = ∫⁻ ω', ⨅m, f (n+1) m (compapp ω ω') ∂K n ω := by {
+      have hf1inf : ∀n ω, ⨅m, f n (m+1) ω = ∫⁻ ω', ⨅m, f (n+1) m (compapp ω ω') ∂K n ω := by {
         intro n ω
+        -- symm
+        simp_rw [hf1]
         symm
         apply lintegral_iInf
-        -- refine Eq.symm (lintegral_iInf (hf n) (fmono 0) ?_)
+        · intro m
+          apply Measurable.comp'
+          apply hf
+          apply measurable_compapp_snd
+        · refine antitone_lam ?_
+          intro b
+          exact fun ⦃a b_1⦄ a_1 ↦ fmono (n + 1) a_1 (compapp ω b)
+        · suffices _ < ⊤ by refine LT.lt.ne_top this
+          calc ∫⁻ (a : α (n + 1)), f (n + 1) 0 (compapp ω a) ∂(K n) ω
+            <= 1 := by {
+              rw [<- hf1]
+              exact fone n (0 + 1) ω
+            }
+          _ < ⊤ := by exact one_lt_top
       }
 
-      -- have hf1ω : ∀n, ∃ω, (⨅m, f n m ω) > 0 := by {
-      -- }
-      sorry
       apply strong_rec_on_nat_existence (h₀ := choose_spec hf0ω) (h:=fun n ω => ⨅m, f n m ω > 0)
-
       intro n ⟨ω, hω⟩
-      simp at hω
-      specialize hf1inf n ω
-      rw [hf1inf] at hω
       apply prob_method_integral (μ := K n ω)
-      exact hω
+      rw [<- hf1inf]
+      calc 0 < ⨅ m, f n m ω := by exact hω
+        _ <= ⨅ m, f n (m + 1) ω := by apply le_iInf_comp
 
     · sorry
       unfold MeasureKernelSequenceContent

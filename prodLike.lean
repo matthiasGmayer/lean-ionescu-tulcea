@@ -45,6 +45,19 @@ def ProdLikeM.snd_type (P : ProdLikeM F α β) := β
 def ProdLikeM.fst [P : ProdLikeM F α β] (x : F) : α := (P.equiv x).fst
 def ProdLikeM.snd [P : ProdLikeM F α β] (x : F) : β := (P.equiv x).snd
 
+@[measurability]
+def ProdLikeM.measurable_fst [p : ProdLikeM F α β]
+  : Measurable (p.fst) := by {
+    apply Measurable.comp ?_ (MeasurableEquiv.measurable equiv)
+    exact _root_.measurable_fst
+  }
+@[measurability]
+def ProdLikeM.measurable_snd [p : ProdLikeM F α β]
+  : Measurable (p.snd) := by {
+    apply Measurable.comp ?_ (MeasurableEquiv.measurable equiv)
+    exact _root_.measurable_snd
+  }
+
 
 def change_left [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
   (K : Kernel α β) (τ : α ≃ᵐ γ) : Kernel γ β := K.comap τ.invFun τ.measurable_invFun
