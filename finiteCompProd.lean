@@ -2,6 +2,7 @@
 This might make the loading time of a file a bit longer. If you want a good chunk of Mathlib, but not everything, you can `import Mathlib.Tactic` and then add more imports as necessary. -/
 import IonescuTulcea.prodLike
 import IonescuTulcea.equivalences
+import IonescuTulcea.AddContentExtension
 import Mathlib
 
 open IndexedFamilies
@@ -31,23 +32,9 @@ def FiniteCompMeasureKernelNat
   [∀m, MeasurableSpace (α m)]
   (μ : Measure (α 0))
   (K : ∀(m : ℕ), Kernel (⇑α {k|k <= m}) (α (m+1)))
-  -- (K : ∀m, Kernel (∀k ≤ m, α k) (α (m+1)))
   : (n : ℕ) -> Measure (⇑α {k|k <= n})
   | 0 => convert_measure μ
-  | m + 1 => compProd' (FiniteCompMeasureKernelNat μ K m) (K m)
-    -- (p := ProdLikeM.insert_n_plus_1 m)
-
--- def FiniteCompMeasureKernelNat'
---   {α : ℕ -> Type*}
---   [∀m, MeasurableSpace (α m)]
---   {n₀ : ℕ}
---   (μ : Measure (⇑α {k|k <= n₀}))
---   (K : ∀(m : ℕ), Kernel (⇑α {k|k <= m}) (α (m+1)))
---   -- (K : ∀m, Kernel (∀k ≤ m, α k) (α (m+1)))
---   : (n : ℕ) -> Measure (⇑α {k|k <= n₀+n})
---   | 0 => μ
---   | m + 1 => compProd' (FiniteCompMeasureKernelNat μ K m) (K (n₀ + m))
-    -- (p := ProdLikeM.insert_n_plus_1 m)
+  | m + 1 => FiniteCompMeasureKernelNat  μ K m ⊗ₘ' K m
 
 def FiniteCompKernelNat
   {α : ℕ -> Type*}
@@ -57,10 +44,7 @@ def FiniteCompKernelNat
   : (m : ℕ) -> Kernel (⇑α {k | k <= n}) (⇑α {k | n < k ∧ k <= n+m+1})
   | 0 => convert_kernel (K n)
   | m+1 =>
-    Kernel.compProd' (FiniteCompKernelNat K n m) (K (n + m + 1))
-      -- (p := ProdLikeMIn.insert_m (α := α) n (m+1))
-      -- (q := ProdLikeM.ge_n_insert_m_plus_1 (α := α) n (m+1))
-
+    FiniteCompKernelNat K n m ⊗ₖ' K (n + m + 1)
 
 instance compProd'_stays_probability
   [MeasurableSpace α]
@@ -328,6 +312,26 @@ lemma cylinder_subset (α : ℕ -> Type*) [mα :∀n, MeasurableSpace (α n)]
   · rw [<- hx]
     rfl
 }
+
+lemma cylinder_iInter
+  {α : ℕ -> Type*}
+  [∀i, MeasurableSpace (α i)]
+  {n : ℕ}
+  [Countable I]
+  (A : I -> Set _)
+  (hA : ∀i, A i ∈ cylinder_n α n)
+  : ⋂i, A i ∈ cylinder_n α n := by {
+    simp [cylinder_n, *] at *
+    let x n := choose (hA n)
+    let hx n := choose_spec (hA n)
+    let hx1 n := (hx n).1
+    let hx2 n := (hx n).2
+    use ⋂n, x n
+    constructor
+    · exact MeasurableSet.iInter hx1
+    · simp_rw [preimage_iInter, hx2]
+  }
+
 
 lemma restrict_preimage_subset_iff
   {α : I -> Type*}
@@ -804,6 +808,24 @@ lemma cylinders_SetAlgebra (α : ℕ -> Type*) [mα : ∀n, MeasurableSpace (α 
     · rw [<- hy, <- hx]
       rfl
   }
+
+
+lemma cylinders_setSemiRing (α : ℕ -> Type*) [mα : ∀n, MeasurableSpace (α n)]
+  : IsSetSemiring (cylinders α)
+  := SetAlgebraIsSetSemiRing (cylinders_SetAlgebra α)
+
+lemma univ_cylinder_n (n : ℕ) (α : ℕ -> Type*) [mα : ∀n, MeasurableSpace (α n)] : univ ∈ cylinder_n α n := by {
+  unfold cylinder_n
+  simp
+  use univ
+  simp
+}
+lemma univ_cylinders (α : ℕ -> Type*) [mα : ∀n, MeasurableSpace (α n)] : univ ∈ cylinders α := by {
+  unfold cylinders
+  simp
+  use 0
+  exact univ_cylinder_n 0 α
+}
 
 def compose
   {α : I -> Type*} {J K : Set I}

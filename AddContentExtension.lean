@@ -83,15 +83,15 @@ def sSubAdditive  : Prop :=
   ∀⦃A : ℕ → Set α⦄, (∀ i, (A i) ∈ S) -> (⋃ i, A i ∈ S) →
     μ (⋃ i, A i) <= ∑' i, μ (A i)
 
-def sContinuousFromBelow  : Prop :=
-  ∀⦃A : ℕ → Set α⦄ {B : Set α }, (∀ i, (A i) ∈ S) -> (B ∈ S) ->
-  (Tendsto A atTop (𝓝[≤] B)) ->
-  Tendsto (λ n => μ (A n)) atTop (𝓝 (μ B))
+-- def sContinuousFromBelow  : Prop :=
+--   ∀⦃A : ℕ → Set α⦄ {B : Set α }, (∀ i, (A i) ∈ S) -> (B ∈ S) ->
+--   (Tendsto A atTop (𝓝[≤] B)) ->
+--   Tendsto (λ n => μ (A n)) atTop (𝓝 (μ B))
 
-def sContinuousFromAbove  : Prop :=
-  ∀⦃A : ℕ → Set α⦄ (B : Set α), (∀ i, (A i) ∈ S) -> (B ∈ S) -> (μ (A 0) < ∞) ->
-  (Tendsto A atTop (𝓝[≥] B)) ->
-  Tendsto (λ n => μ (A n)) atTop (𝓝 (μ B))
+-- def sContinuousFromAbove  : Prop :=
+--   ∀⦃A : ℕ → Set α⦄ (B : Set α), (∀ i, (A i) ∈ S) -> (B ∈ S) -> (μ (A 0) < ∞) ->
+--   (Tendsto A atTop (𝓝[≥] B)) ->
+--   Tendsto (λ n => μ (A n)) atTop (𝓝 (μ B))
 
 def sContinuousInEmpty  : Prop :=
   ∀⦃A : ℕ → Set α⦄, (∀ i, (A i) ∈ S) -> (μ (A 0) < ∞) ->
@@ -105,17 +105,19 @@ lemma sAdditive_implies_sSubAdditive : μ.sAdditive -> μ.sSubAdditive := by {
   intro h A hA hAU
   sorry
 }
-lemma sSubAdditive_implies_sAdditive : μ.sSubAdditive -> μ.sAdditive := sorry
+-- lemma sSubAdditive_implies_sAdditive : μ.sSubAdditive -> μ.sAdditive := sorry
 
-lemma sAdditive_implies_sContinuousFromBelow : μ.sAdditive -> μ.sContinuousFromBelow := sorry
-lemma sContinuousFromBelow_implies_sAdditive : μ.sContinuousFromBelow -> μ.sAdditive := sorry
+-- lemma sAdditive_implies_sContinuousFromBelow : μ.sAdditive -> μ.sContinuousFromBelow := sorry
+-- lemma sContinuousFromBelow_implies_sAdditive : μ.sContinuousFromBelow -> μ.sAdditive := sorry
 
-lemma sContinuousFromAbove_implies_sContinuousInEmpty : μ.sContinuousFromAbove -> μ.sContinuousInEmpty := sorry
-lemma sContinuousInEmpty_implies_sContinuousFromAbove : μ.sContinuousInEmpty -> μ.sContinuousFromAbove := sorry
+-- lemma sContinuousFromAbove_implies_sContinuousInEmpty : μ.sContinuousFromAbove -> μ.sContinuousInEmpty := sorry
+-- lemma sContinuousInEmpty_implies_sContinuousFromAbove : μ.sContinuousInEmpty -> μ.sContinuousFromAbove := sorry
 
-lemma sAdditive_implies_sContinuousInEmpty : μ.sAdditive -> μ.sContinuousInEmpty := sorry
+-- lemma sAdditive_implies_sContinuousInEmpty : μ.sAdditive -> μ.sContinuousInEmpty := sorry
 
-lemma sContinuousInEmpty_finite_implies_sAdditive : μ.sContinuousInEmpty ∧ μ univ < ∞ -> μ.sAdditive := sorry
+lemma sContinuousInEmpty_finite_implies_sAdditive : μ.sContinuousInEmpty ∧ μ univ < ∞ -> μ.sAdditive := by {
+
+}
 
 
 def toOuterMeasure :=
@@ -283,19 +285,6 @@ def toMeasure (hSG : mα = generateFrom S) (hS : IsSetAlgebra S) (hμ : μ.sAddi
     exact hSC s hs
   }
   let ν := μ'.toMeasure hν
-  have hν : ∀s ∈ S, ν s = μ s := by {
-    intro s hs
-    have hμμ' : μ s = μ' s := by exact Eq.symm (outer_measure_equal_on_S μ hS s hs hμ)
-    rw [hμμ']
-    unfold ν
-    simp [OuterMeasure.toMeasure]
-    have hsM : MeasurableSet s := by {
-      have h := measurableSet_generateFrom hs
-      rw [<- hSG] at h
-      exact h
-    }
-    apply Measure.ofMeasurable_apply s hsM
-  }
   exact ν
 }
 

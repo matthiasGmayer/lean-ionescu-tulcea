@@ -4,6 +4,7 @@ import IonescuTulcea
 import IonescuTulcea.finiteCompProd
 import IonescuTulcea.finiteCompProdProps
 import IonescuTulcea.strong_rec
+import IonescuTulcea.AddContentExtension
 import Mathlib
 -- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 
@@ -12,6 +13,7 @@ set_option autoImplicit true
 open Function Set Classical ENNReal ProductProbabilityMeasure IndexedFamilies
 
 /- recommended whenever you define anything new. -/
+open Filter Topology
 noncomputable section
 
 
@@ -23,7 +25,24 @@ open MeasureTheory MeasurableSpace Measurable ProductLike ProductProbabilityMeas
 -- Ionescu-Tulcea
 open ProbabilityMeasure Measure ProductLike
 
-open ProbabilityTheory
+open ProbabilityTheory ENNReal
+
+-- #check biSup_sup_biSup
+-- lemma biSup_sup' {α : Type*} {I : Type*} {s : I -> α}
+--   [CompleteLattice α]
+--   {J K L : Finset I}
+--   (hJKL : K ∪ L = J)
+--   : ⨆ i ∈ J, s i = (⨆ i ∈ K, s i) ⊔ (⨆ i ∈ L, s i) := by {
+--     subst hJKL
+--     rw [← @Finset.iSup_union]
+--     simp
+-- }
+lemma biUnion_union' {α : Type*} {I : Type*} {s : I -> Set α}
+  {J K L : Finset I}
+  (hJKL : K ∪ L = J)
+  : ⋃ i ∈ J, s i = (⋃ i ∈ K, s i) ∪ ⋃ i ∈ L, s i := by {
+    aesop
+}
 
 lemma Surj_emp (f : α -> β) (hf : Surjective f) (hS : f ⁻¹' S = ∅) : S = ∅  := by {
   rw [show ∅ = f ⁻¹' ∅ by exact rfl] at hS
@@ -190,7 +209,6 @@ lemma MeasureKernelSequenceContent_cylinder_apply
   }
 
 -- lemma seq_inf : Tendsto a atTop 0 :
-open Filter Topology
 
 
 -- def slice {α : I -> Type*} (J : Set I)
@@ -260,7 +278,62 @@ lemma prob_method_integral [MeasurableSpace α] (f : α -> ℝ≥0∞) (μ : Mea
 --     exact le_iInf_comp f g
 --   }
 
-theorem MeasureCompKernelNatContentSAdditive
+@[simp]
+lemma MeasureSequenceKernelNatProb
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]
+  (μ : Measure (α 0))
+  [hμ : IsProbabilityMeasure μ]
+  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  [hK : ∀n, IsMarkovKernel (K n)]
+  : MeasureKernelSequenceContent μ K univ = 1 := by {
+    have h : univ ∈ cylinder_n α 0 := by {
+      unfold cylinder_n
+      simp only [coe_setOf, mem_setOf_eq, mem_image, preimage_eq_univ_iff]
+      use univ
+      simp only [MeasurableSet.univ, subset_univ, and_self]
+    }
+    rw [MeasureKernelSequenceContent_cylinder_apply μ K h]
+    simp only [coe_setOf, mem_setOf_eq, preimage_eq_univ_iff]
+    generalize_proofs hT
+    suffices choose hT = univ by simp [this]; exact measure_univ
+    have h := (choose_spec hT).2
+    simp at h
+    generalize hs : choose hT = s
+    rw [hs] at h
+    suffices range {x | x <= 0}.restrict = univ by {
+      rw [this] at h
+      simp only [coe_setOf, mem_setOf_eq, univ_subset_iff] at h
+      exact h
+    }
+    ext x
+    simp only [coe_setOf, mem_setOf_eq, mem_range, mem_univ, iff_true]
+    exact Subtype.exists_pi_extension x
+  }
+
+lemma MeasureSequenceKernelNatLeOne
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]
+  (μ : Measure (α 0))
+  [hμ : IsProbabilityMeasure μ]
+  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  [hK : ∀n, IsMarkovKernel (K n)]
+  {s : Set _}
+  (hs : s ∈ cylinders α)
+  : MeasureKernelSequenceContent μ K s ≤ 1 := by {
+    suffices _ <= MeasureKernelSequenceContent μ K univ by {
+    simp only [MeasureSequenceKernelNatProb] at this
+    exact this
+    }
+    apply addContent_mono $ SetAlgebraIsSetSemiRing (cylinders_SetAlgebra α)
+    exact hs
+    exact univ_cylinders α
+    simp only [subset_univ]
+  }
+
+theorem MeasureKernelSequenceContentSAdditive
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
   [∀m, Inhabited (α m)]
@@ -275,29 +348,108 @@ theorem MeasureCompKernelNatContentSAdditive
         (∀n, (B n) ∈ cylinder_n α n) ->
         (∀n, B n ⊇ B (n+1)) ->
         ⋂n, B n = ∅ ->
-        Tendsto (fun n => MeasureKernelSequenceContent μ K (B n)) atTop (𝓝 0) by {
+        Tendsto (fun n => MeasureKernelSequenceContent μ K (B n)) atTop (𝓝 0) by
           intro A hA hT hmono hempsect
           unfold cylinders at hA
           simp only [mem_iUnion] at hA
-          let f n := Nat.find (hA n)
-          have hf n := Nat.find_spec (hA n)
-          simp_rw [show ∀n, Nat.find (hA n) = f n by intros; rfl] at hf
-          have hfmin n {m} (hm : m < f n) : A n ∉ cylinder_n α m := Nat.find_min (hA n) hm
-          have hf : Monotone f := by {
-            apply monotone_nat_of_le_succ
+          let B n := ⋂ m ∈ {m| m <= n ∧ A m ∈ cylinder_n α n}, A m
+          have hB : ∀n, B n ∈ cylinder_n α n := by {
             intro n
-            by_contra h
-            push_neg at h
-            have hcyl : cylinder_n α (f (n +1)) ⊆ cylinder_n α (f n) := by {
-              apply cylinder_subset
-              exact Nat.le_of_succ_le h
-            }
-            specialize hfmin n h
-            specialize hf n
-            apply hfmin
+            unfold B
+            rw [@biInter_eq_iInter]
+            apply cylinder_iInter
+            simp only [coe_setOf, mem_setOf_eq, Subtype.forall, and_imp, imp_self, implies_true]
           }
-        }
-      sorry
+          have hBcylinder n : B n ∈ cylinders α := by {
+            unfold cylinders
+            simp only [mem_iUnion]
+            use n
+            exact hB n
+          }
+          have hBmono : ∀n, B n ⊇ B (n+1) := by {
+            simp only [B, subset_iInter_iff]
+            intro n m' hA
+            simp at hA
+            calc ⋂ m ∈ {m | m <= n+1 ∧ A m ∈ cylinder_n α (n + 1)}, A m ⊆
+                ⋂ m ∈ {m | m = m'}, A m := by {
+                  apply biInter_mono
+                  simp only [setOf_eq_eq_singleton, singleton_subset_iff, mem_setOf_eq]
+                  constructor
+                  · omega
+                  · exact cylinder_subset α (Nat.le_add_right n 1) hA.2
+                  simp only [setOf_eq_eq_singleton, mem_singleton_iff, subset_refl, implies_true]
+                  }
+            _ = A m' := by simp only [setOf_eq_eq_singleton, mem_singleton_iff,
+                iInter_iInter_eq_left]
+          }
+          have hBempsect : ⋂n, B n = ∅ := by {
+            unfold B
+            calc ⋂ n, ⋂ m ∈ {m | m <= n ∧ A m ∈ cylinder_n α n}, A m = ⋂ m, A m  := by {
+              ext x
+              simp only [mem_setOf_eq, mem_iInter]
+              constructor <;> intro h
+              · intro i
+                obtain ⟨i',h'⟩ := hA i
+                apply h (i' ⊔ i) i
+                simp only [le_sup_right, true_and]
+                apply cylinder_subset α (by omega) h'
+              ·
+                intro i i_1 i_2
+                simp_all only [Nat.lt_find_iff, le_refl, not_false_eq_true, implies_true, mem_setOf_eq,
+                  subset_iInter_iff, B]
+            }
+            _ = ∅ := by exact hempsect
+          }
+          specialize this B hB hBmono hBempsect
+
+          let F := fun n => MeasureKernelSequenceContent μ K (A n)
+          simp_rw [show (fun n => MeasureKernelSequenceContent μ K (A n)) = F by rfl]
+          have hFbounded : ∀n, F n ≠ ⊤ := by {
+            intro n
+            suffices F n < ⊤ by exact LT.lt.ne_top this
+            calc F n <= 1 := MeasureSequenceKernelNatLeOne μ K (by unfold cylinders; simp only [mem_iUnion]; exact hA n)
+            _ < ⊤ := by simp only [one_lt_top]
+          }
+          have hAcylinder n : A n ∈ cylinders α := by {
+            unfold cylinders
+            simp only [mem_iUnion]
+            exact hA n
+          }
+          have hFantitone : Antitone F := by {
+            intro n m hnm
+            exact addContent_mono (cylinders_setSemiRing α)
+              (hAcylinder m)
+              (hAcylinder n)
+              (hmono hnm)
+          }
+          suffices BsupA : ∀n, ∃m, B n ⊇ A m by {
+            rw [@ENNReal.tendsto_atTop_zero]
+            rw [@ENNReal.tendsto_atTop_zero] at this
+            intro ε hε
+            specialize this ε hε
+            obtain ⟨N, hN⟩ := this
+            specialize BsupA N
+            obtain ⟨m, hm⟩ := BsupA
+            use m
+            intro n hn
+            specialize hN N (by rfl)
+            calc F n ≤ F m := by exact hFantitone hn
+            _ <= (MeasureKernelSequenceContent μ K) (B N) := by {
+              apply addContent_mono (cylinders_setSemiRing α)
+               (hAcylinder m)
+               (hBcylinder N)
+               (hm)
+            }
+            _ <= ε := by exact hN
+          }
+          intro n
+          use n
+          unfold B
+          intro x hx
+          simp only [mem_setOf_eq, mem_iInter, and_imp]
+          intro i hi hc
+          exact hmono hi hx
+
       intro B hB hmono hempsect
       by_contra hcontra
       let A n := choose (hB n)
@@ -505,7 +657,8 @@ theorem MeasureCompKernelNatContentSAdditive
         rw [compProd'_measure_kernel_finite_comp]
         have h0 : {k | k <= 0 + (m+1)} = {k | k <= m+1} := by simp only [zero_add]
         have h1 : 0+m+1 = m+1 := by simp only [zero_add]
-        congr <;> try rw [h0] <;> try rw [h1]
+        congr <;> try rw [h0]
+        -- <;> try rw [h1]
         exact congr_arg_heq A h1
         exact hA (0 + m + 1)
       }
@@ -572,7 +725,7 @@ theorem MeasureCompKernelNatContentSAdditive
       calc 0 < ⨅ m, f n m ω := by exact hω
         _ <= ⨅ m, f n (m + 1) ω := by apply le_iInf_comp
 
-    · sorry
+    ·
       unfold MeasureKernelSequenceContent
       simp only [coe_setOf, mem_setOf_eq, AddContent.mk'_on_C, preimage_eq_univ_iff]
       have nothing : univ ∈ cylinder_n α 0 := by {
@@ -617,11 +770,6 @@ theorem MeasureCompKernelNatContentSAdditive
         }
       exact h2
   }
-
--- lemma test : ({0,1}:Set ℕ) = {k|k < 2} := by exact toFinset_inj.mp rfl
-
--- lemma test2 : (J : Set I) (hJ : Finite J) : Finset J :=
-/- ENDFILE HERE
 
 def pi_equiv (α : I -> Type*) (J : Set I) (T : Type*) (TJequiv : T ≃ J)
 [mα : ∀i : I, MeasurableSpace (α i)]
@@ -723,6 +871,8 @@ lemma cylinders_generate
     exact Eq.symm generateFrom_measurableCylinders
   }
 
+
+
 def CompMeasureKernelNat
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
@@ -735,30 +885,87 @@ def CompMeasureKernelNat
   := (MeasureKernelSequenceContent μ K).toMeasure
     (cylinders_generate α)
     (cylinders_SetAlgebra α)
-    (MeasureCompKernelNatContentSAdditive μ K)
+    (MeasureKernelSequenceContentSAdditive μ K)
+
+
+instance CompMeasureKernelNat_on_cylinders
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]
+  (μ : Measure (α 0))
+  [hμ : IsProbabilityMeasure μ]
+  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  [hK : ∀n, IsMarkovKernel (K n)]
+  (s : Set (∀k, α k))
+  (hs : s ∈ cylinders α)
+  : CompMeasureKernelNat μ K s = MeasureKernelSequenceContent μ K s := by {
+    unfold CompMeasureKernelNat
+    rwa [AddContent.toMeasure_eq_on_S]
+  }
+
+
+instance CompMeasureKernelNatProbability
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]
+  (μ : Measure (α 0))
+  [hμ : IsProbabilityMeasure μ]
+  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  [hK : ∀n, IsMarkovKernel (K n)]
+  : IsProbabilityMeasure (CompMeasureKernelNat μ K) := by {
+    rw [@isProbabilityMeasure_iff]
+    rw [CompMeasureKernelNat_on_cylinders]
+    exact (MeasureSequenceKernelNatProb μ K)
+    exact (univ_cylinders α)
+  }
+
+
 
 
 -- #check Measure.ext_of_generateFrom_of_iUnion
 -- #check MeasureTheory.ext_of_generate_finite
--- theorem uniqeness_of_prob_measures [mα : MeasurableSpace α] (μ ν : ProbabilityMeasure α)
---   {S : Set (Set α)}
---   (hSG : mα = generateFrom S) (hS : IsPiSystem S) (he : ∀s ∈ S, μ s = ν s) : μ = ν := by {
---     ext t ht
---     induction t, ht using induction_on_inter with
---     | h_eq => exact hSG
---     | h_inter => exact hS
---     | empty => simp
---     | basic t' ht' => {
---       specialize he t' ht'
---       repeat rw [← ennreal_coeFn_eq_coeFn_toMeasure]
---       norm_cast
---     }
---     | compl t' ht' h => rw [prob_compl_eq_one_sub ht', prob_compl_eq_one_sub ht', h]
---     | iUnion A pd mA hi => {
---       rw [measure_iUnion pd mA, measure_iUnion pd mA]
---       exact tsum_congr fun b ↦ hi b
---     }
---   }
+lemma uniqeness_of_prob_measures [mα : MeasurableSpace α] (μ ν : Measure α)
+  (hμ : IsProbabilityMeasure μ) (hν : IsProbabilityMeasure ν)
+  {S : Set (Set α)}
+  (hSG : mα = generateFrom S) (hS : IsPiSystem S) (he : ∀s ∈ S, μ s = ν s) : μ = ν := by {
+    ext t ht
+    induction t, ht using induction_on_inter with
+    | h_eq => exact hSG
+    | h_inter => exact hS
+    | empty => simp
+    | basic t' ht' => {
+      specialize he t' ht'
+      norm_cast
+    }
+    | compl t' ht' h => rw [prob_compl_eq_one_sub ht', prob_compl_eq_one_sub ht', h]
+    | iUnion A pd mA hi => {
+      rw [measure_iUnion pd mA, measure_iUnion pd mA]
+      exact tsum_congr fun b ↦ hi b
+    }
+  }
+
+theorem uniqueness_compMeasureKernelNat
+  {α : ℕ -> Type*}
+  [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]
+  (μ : Measure (α 0))
+  [hμ : IsProbabilityMeasure μ]
+  (K : ∀m, Kernel (∀k: {k|k <= m}, α k) (α (m+1)))
+  [hK : ∀n, IsMarkovKernel (K n)]
+  (ν : Measure (∀k, α k))
+  [hν : IsProbabilityMeasure ν]
+  (h : ∀s ∈ cylinders α, CompMeasureKernelNat μ K s = ν s)
+  : CompMeasureKernelNat μ K = ν := by {
+    apply uniqeness_of_prob_measures
+    exact CompMeasureKernelNatProbability μ K
+    exact hν
+    sorry
+    -- exact Eq.symm cylinders_generate
+    -- exact isPiSystem_measurableCylinders
+
+    -- exact cylinders_SetAlgebra α
+    -- exact h
+  }
 
 
 
@@ -777,3 +984,4 @@ def CompMeasureKernelNat
 --     = ProductProbabilityMeasure (J.restrict P) := by {
 --       sorry
 --   }
+--/

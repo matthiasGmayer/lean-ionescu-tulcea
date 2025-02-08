@@ -28,6 +28,7 @@ open ProbabilityMeasure Measure ProductLike
 instance project_coerce {I : Type*} : CoeFun (I -> Type _) (fun _ => Set I -> Type _) where
   coe α J := ∀k : J, α k
 open ProbabilityTheory
+
 class EquivalentMeasurableSpace (α : Type*) (β : Type*)
   [MeasurableSpace α] [MeasurableSpace β] where
   equiv : α ≃ᵐ β

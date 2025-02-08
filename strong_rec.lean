@@ -88,7 +88,8 @@ lemma strong_rec_on_nat_proj_prop
     exact (strong_rec_on_nat_aux h₀ ind n).2
   }
 def strong_rec_on_nat
-  {α : ℕ -> Type*} {h : ∀n (_ : ∀k : {k | k <= n}, α k), Prop}
+  {α : ℕ -> Type*}
+  {h : ∀n (ω : ∀k : {k | k <= n}, α k), Prop}
   {ω₀ : ∀k : {k | k <= 0}, α k} (h₀ : h 0 ω₀)
   [∀n, Inhabited (α n)]
   (ind : ∀n (ω : {ω | h n ω}), ∃ω' : α (n+1), h (n+1) (compapp ω.1 ω'))

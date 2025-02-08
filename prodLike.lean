@@ -104,7 +104,7 @@ lemma ProdLikeM.slice_measurable
 
 
 def compProd' (μ : Measure α) (K : Kernel α β) [p: ProdLikeM γ α β]
-  : MeasureTheory.Measure γ := (μ.compProd K).map p.equiv.symm
+  : Measure γ := (μ ⊗ₘ K).map p.equiv.symm
 
 infixl:100 " ⊗ₖ' " => Kernel.compProd'
 infixl:100 " ⊗ₘ' " => compProd'
