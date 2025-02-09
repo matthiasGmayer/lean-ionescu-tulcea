@@ -1,14 +1,16 @@
 import Mathlib
 import IonescuTulcea.finiteCompProd
--- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
-
 set_option autoImplicit true
-/- open namespaces that you use to shorten names and enable notation. -/
-open Function Set Classical ENNReal  ProductProbabilityMeasure
+open Function Set Classical ENNReal CompProdMeasures
 
-/- recommended whenever you define anything new. -/
 noncomputable section
 
+/-!
+This file defines a strong recursion principle to construct a sequence of elements,
+such that propositions about the projections on all {k <= n} are true.
+-/
+
+namespace StrongRec
 
 def strong_rec_on_nat_aux
   {α : ℕ -> Type*} {h : ∀n (_ : ∀k : {k | k <= n}, α k), Prop}

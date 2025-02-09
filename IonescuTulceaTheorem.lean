@@ -1,58 +1,35 @@
-/- It is fine to import all of Mathlib in your project.
-This might make the loading time of a file a bit longer. If you want a good chunk of Mathlib, but not everything, you can `import Mathlib.Tactic` and then add more imports as necessary. -/
+import Mathlib
 import IonescuTulcea
+import IonescuTulcea.strong_rec
 import IonescuTulcea.finiteCompProd
 import IonescuTulcea.finiteCompProdProps
-import IonescuTulcea.strong_rec
-import IonescuTulcea.AddContentExtension
-import Mathlib
--- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
+
+/-!
+    # Ionescu-Tulcea Theorem
+    We define the Content on the cylinders
+    and prove that it is sigma additive.
+    This then provides a toMeasure function via AddContentExtension.
+    We further show that this is the unique measure that extends the content on cylinders.
+    The proof follows the proof in the lecture notes 'Probability Theory' of Ritter at RPTU Kaiserslautern-Landau
+-/
+
+
 
 set_option autoImplicit true
-/- open namespaces that you use to shorten names and enable notation. -/
-open Function Set Classical ENNReal ProductProbabilityMeasure IndexedFamilies
-
-/- recommended whenever you define anything new. -/
-open Filter Topology
 noncomputable section
 
 
-/- Now write definitions and theorems. -/
-
-namespace ProductProbabilityMeasure
-open MeasureTheory MeasurableSpace Measurable ProductLike ProductProbabilityMeasure
-
--- Ionescu-Tulcea
+namespace IonescuTulceaTheorem
+open Function Set Classical ENNReal IndexedFamilies Filter Topology CompProdMeasures
+open MeasureTheory MeasurableSpace Measurable ProductLike Kernel
 open ProbabilityMeasure Measure ProductLike
-
 open ProbabilityTheory ENNReal
-
--- #check biSup_sup_biSup
--- lemma biSup_sup' {α : Type*} {I : Type*} {s : I -> α}
---   [CompleteLattice α]
---   {J K L : Finset I}
---   (hJKL : K ∪ L = J)
---   : ⨆ i ∈ J, s i = (⨆ i ∈ K, s i) ⊔ (⨆ i ∈ L, s i) := by {
---     subst hJKL
---     rw [← @Finset.iSup_union]
---     simp
--- }
-lemma biUnion_union' {α : Type*} {I : Type*} {s : I -> Set α}
-  {J K L : Finset I}
-  (hJKL : K ∪ L = J)
-  : ⋃ i ∈ J, s i = (⋃ i ∈ K, s i) ∪ ⋃ i ∈ L, s i := by {
-    aesop
-}
+open Kernel StrongRec
 
 lemma Surj_emp (f : α -> β) (hf : Surjective f) (hS : f ⁻¹' S = ∅) : S = ∅  := by {
   rw [show ∅ = f ⁻¹' ∅ by exact rfl] at hS
   exact (preimage_eq_preimage hf).mp (id (Eq.symm hS)).symm
 }
-
-lemma Surj_disjoint (f : α -> β) (hf : Surjective f) (hab : Disjoint (f ⁻¹' a) (f ⁻¹' b))
-  : Disjoint a b := by {
-    exact Disjoint.of_preimage hf hab
-  }
 
 lemma restrict_union (α : I -> Type*)
 [∀i, Inhabited (α i)]
@@ -79,11 +56,14 @@ lemma restrict_union (α : I -> Type*)
   }
 
 lemma restrict_surjective (α : I -> Type*) [∀i, Nonempty (α i)] {J : Set I} : Surjective (J.restrict (π := α)) := by {
-  -- unfold Surjective
   intro b
   exact Subtype.exists_pi_extension b
 }
 
+
+/-!
+This is the content that we will extend to the full product space.
+-/
 def MeasureKernelSequenceContent
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
@@ -165,6 +145,10 @@ def MeasureKernelSequenceContent
     })
 
 
+/-!
+When we apply the content to a cylinder set,
+we get the finite compositional product of the finite dimensional applied to the base of the cylinder.
+-/
 lemma MeasureKernelSequenceContent_cylinder_apply
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
@@ -208,55 +192,6 @@ lemma MeasureKernelSequenceContent_cylinder_apply
     exact (choose_spec h2).1
   }
 
--- lemma seq_inf : Tendsto a atTop 0 :
-
-
--- def slice {α : I -> Type*} (J : Set I)
---   (A : Set (∀i : J, α i)) (K : Set I) (ω : (∀i : K, α i))
---   : Set (∀i : ↑(J \ K), α i)
---   := {x | }
-
-def partial_apply
-  {α : I -> Type*}
-  [∀n, Inhabited (α n)]
-  {J K L : Set I}
-  (ω : ∀k: J, α k)
-  (f : (∀k: K, α k) -> β)
-  (ω₂ : (∀k : L, α k))
-  : β :=
-  let ω₂ := compose ω ω₂
-  f (K.restrict ω₂)
-
-theorem measurable_partial_apply
-  {α : I -> Type*}
-  [∀n, Inhabited (α n)]
-  [∀n, MeasurableSpace (α n)]
-  [MeasurableSpace β]
-  {J K L : Set I}
-  (ω : ∀k: J, α k)
-  (f : (∀k: K, α k) -> β)
-  (hf : Measurable f)
-  : Measurable (partial_apply (L := L) ω f) := by {
-    unfold partial_apply
-    simp only
-    apply Measurable.comp' hf
-    apply Measurable.comp'
-    exact measurable_restrict K
-    exact measurable_compose_snd ω
-  }
-
-def partial_apply_kernel_n {α : ℕ -> Type*} {n:ℕ}
-  [∀n, MeasurableSpace (α n)]
-  [∀n, Inhabited (α n)]
-  (K : Kernel (∀k: {k|k <= n}, α k) (α (n+1)))
-  {m : ℕ} (ω : ∀k: {k|k<=m}, α k)
-  : Kernel (∀k: {k | m < k <= n}, α k) (α (n+1)) where
-  toFun := partial_apply ω K.toFun
-  measurable' := by {
-    apply measurable_partial_apply
-    exact K.measurable'
-  }
-
 lemma prob_method_integral [MeasurableSpace α] (f : α -> ℝ≥0∞) (μ : Measure α)
   (hpos: ∫⁻x, f x ∂μ > 0) : ∃x, f x > 0 := by {
     by_contra h
@@ -268,15 +203,6 @@ lemma prob_method_integral [MeasurableSpace α] (f : α -> ℝ≥0∞) (μ : Mea
     rw [h] at hpos
     exact (lt_self_iff_false 0).mp hpos
 }
--- lemma test (f : I -> ℝ≥0∞) (hf : ∀i, f i >= c)
---   : (⨅i, f i) >= c := by {
---     exact le_iInf hf
---   }
-
--- lemma iInf_fun {α : I -> Type*} {f : I -> ℝ≥0∞} {g : I -> I}
---   : ⨅i, f i <= ⨅i, f (g i)  := by {
---     exact le_iInf_comp f g
---   }
 
 @[simp]
 lemma MeasureSequenceKernelNatProb
@@ -333,6 +259,14 @@ lemma MeasureSequenceKernelNatLeOne
     simp only [subset_univ]
   }
 
+
+/-!
+This is the major construction of the IOnescu-Tulcea theorem.
+We show that the content is sigma additive.
+this is done by having a strong recursion using the probabilistic method in each step
+to arrive at a contradiction.
+-/
+
 theorem MeasureKernelSequenceContentSAdditive
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
@@ -343,7 +277,12 @@ theorem MeasureKernelSequenceContentSAdditive
   [hK : ∀n, IsMarkovKernel (K n)]
   : (MeasureKernelSequenceContent μ K).sAdditive := by {
     apply AddContent.sContinuousInEmpty_finite_implies_sAdditive
-    constructor
+    exact cylinders_SetAlgebra α
+    exact univ_cylinders α
+    have huniv : (MeasureKernelSequenceContent μ K) univ < ⊤ :=
+      calc (MeasureKernelSequenceContent μ K) univ <= 1 := by exact MeasureSequenceKernelNatLeOne μ K (univ_cylinders α)
+      _ < ⊤ := by simp
+    exact huniv
     · suffices ∀(B : (n : ℕ) -> Set _),
         (∀n, (B n) ∈ cylinder_n α n) ->
         (∀n, B n ⊇ B (n+1)) ->
@@ -724,155 +663,67 @@ theorem MeasureKernelSequenceContentSAdditive
       rw [<- hf1inf]
       calc 0 < ⨅ m, f n m ω := by exact hω
         _ <= ⨅ m, f n (m + 1) ω := by apply le_iInf_comp
-
-    ·
-      unfold MeasureKernelSequenceContent
-      simp only [coe_setOf, mem_setOf_eq, AddContent.mk'_on_C, preimage_eq_univ_iff]
-      have nothing : univ ∈ cylinder_n α 0 := by {
-        unfold cylinder_n
-        simp only [coe_setOf, mem_setOf_eq, mem_image, preimage_eq_univ_iff]
-        use univ
-        simp only [MeasurableSet.univ, subset_univ, and_self]
-      }
-      have h : ∃n, univ ∈ cylinder_n α n := by use 0
-      simp only [h, ↓reduceDIte, gt_iff_lt]
-      generalize_proofs g
-      have hg : choose g = univ := by {
-        have hg := (choose_spec g).2
-        generalize hgg : choose g = gg
-        have hr : range ({x | x <= Nat.find h}.restrict (π := α)) = univ := by {
-          ext x
-          simp
-          exact Subtype.exists_pi_extension x
-        }
-        have hhgg : range {x | x ≤ Nat.find h}.restrict ⊆ gg := by {
-          rw [<- hgg]
-          assumption
-        }
-        rw [hr] at hhgg
-        exact eq_univ_of_univ_subset hhgg
-      }
-      rw [hg]
-      have h1 : (FiniteCompMeasureKernelNat μ K (Nat.find h))
-        (@univ ((k : { x // x ≤ Nat.find h }) → α ↑k) :
-          Set ((k : { x // x ≤ Nat.find h }) → α ↑k))
-        = 1 := by {
-        let t : IsProbabilityMeasure (FiniteCompMeasureKernelNat μ K (Nat.find h))
-          := inferInstance
-        exact isProbabilityMeasure_iff.mp t
-      }
-      have h2 : (FiniteCompMeasureKernelNat μ K (Nat.find h))
-        (@univ ((k : { x // x ≤ Nat.find h }) → α ↑k) :
-          Set ((k : { x // x ≤ Nat.find h }) → α ↑k))
-        < ⊤ := by {
-          rw [h1]
-          simp
-        }
-      exact h2
   }
-
-def pi_equiv (α : I -> Type*) (J : Set I) (T : Type*) (TJequiv : T ≃ J)
-[mα : ∀i : I, MeasurableSpace (α i)]
-: (∀i : J, α i) ≃ᵐ ∀t : T, α (TJequiv t) where
-toFun x t := x (TJequiv t)
-invFun x i :=
-  have h : TJequiv (TJequiv.symm  i) = i := by simp
-  have hα : α (TJequiv (TJequiv.symm  i)) = α i := by rw [h]
-  have hmα : HEq (mα (TJequiv (TJequiv.symm  i))) (mα i) := by rw [h]
-  MeasurableEquiv.cast hα hmα (x (TJequiv.symm i))
-left_inv := by {
-  intro x
-  ext i
-  have h : TJequiv (TJequiv.symm  i) = i := by simp
-  symm
-  simp [MeasurableEquiv.cast]
-  rw [eq_cast_iff_heq]
-  rw [h]
-  }
-right_inv := by {
-  intro x
-  ext i
-  simp [MeasurableEquiv.cast]
-  have h : TJequiv.symm (TJequiv i) = i := by simp
-  symm
-  rw [eq_cast_iff_heq]
-  rw [h]
-  }
-measurable_invFun := by {
-  simp
-  apply measurable_pi_lambda
-  intro j
-  obtain ⟨val, property⟩ := j
-  simp_all only
-  apply Measurable.comp'
-  · apply MeasurableEquiv.measurable
-  · apply measurable_pi_apply
-}
-measurable_toFun := by {
-  simp
-  apply measurable_pi_lambda
-  intro j
-  apply measurable_pi_apply
-}
-set_option pp.proofs true
-
-def Finset_equiv_set (F : Finset I) : (F ≃ (F : Set I)) := Equiv.subtypeEquivProp rfl
-
-def Finset_set_equiv (α : I -> Type*) [mα : ∀m, MeasurableSpace (α m)] (F : Finset I)
-  : (∀i:F, α i) ≃ᵐ ∀i:↑(F : Set I), α i
-    := pi_equiv α F F (Finset_equiv_set F)
-  -- toFun x i := by {
-    -- have : α
-    -- rw [<- h] at i
-    -- have : α
-    -- MeasurableEquiv.cast h x i
-  -- }
-
-lemma  cylinders_measurableCylinders
-  (α : ℕ -> Type*)
-  [mα : ∀m, MeasurableSpace (α m)]
-  : cylinders α = measurableCylinders α := by {
-      unfold cylinders cylinder_n
-      unfold measurableCylinders cylinder
-      simp
-      ext x
-      simp
-      constructor
-      · intro ⟨n, ⟨s, hs⟩⟩
-        let F := Finset.range (n+1)
-        use F
-        have h : Finset.range (n+1) = {k | k <= n} := by {
-          ext y
-          simp
-          omega
-        }
-        -- let t
-        -- let t := Finset_set_equiv α F  ⁻¹' s
-        -- have hα
-        have h' : {x // x <= n} = ↑{k|k<=n} := by rfl
-        have mα1 : MeasurableSpace (∀k:{k|k<=n}, α k) := inferInstance
-        have mα2 : MeasurableSpace (∀k:Finset.range (n+1), α k) := inferInstance
-        #check MeasurableEquiv
-        -- have hm : HEq mα1 mα2 := by {
-        --   rw [<- h']
-        -- }
-
-        rw [h] at s
-        use s
-        -- use i hi
-    }
 
 
 lemma cylinders_generate
   (α : ℕ -> Type*)
-  [∀m, MeasurableSpace (α m)]
+  [mα : ∀m, MeasurableSpace (α m)]
   : by infer_instance = generateFrom (cylinders α) := by {
-    rw [cylinders_measurableCylinders]
-    exact Eq.symm generateFrom_measurableCylinders
+    unfold inferInstance MeasurableSpace.pi
+    apply le_antisymm
+    · apply iSup_le
+      intro i
+      apply measurable_iff_comap_le.mp
+      -- unfold Measurable
+      intro s hs
+      suffices h : ((fun b ↦ b i) ⁻¹' s) ∈ cylinders α by {
+        exact measurableSet_generateFrom h
+      }
+      unfold cylinders
+      simp
+      use i
+      unfold cylinder_n
+      simp
+      let res := ({i} : Set ℕ).restrict₂ (π := α) (show {i} ⊆ {k | k <= i} by simp)
+      let bij : (⇑α {i}) ≃ᵐ α i := MeasurableEquiv.piUnique'' α i rfl
+      let emb := bij ∘ res
+      let s' := emb ⁻¹' s
+      use s'
+      constructor
+      · unfold s'
+        apply MeasurableSet.preimage
+        exact hs
+        apply Measurable.comp
+        exact MeasurableEquiv.measurable bij
+        apply measurable_restrict₂
+      · unfold s' emb
+        ext x
+        simp only [coe_setOf, mem_setOf_eq, mem_preimage, Function.comp_apply]
+        suffices bij (res ({k | k <= i}.restrict x)) = x i by rw [this]
+        unfold res
+        generalize_proofs h
+        rw [show restrict₂ h ({k | k ≤ i}.restrict x) = ({i} : Set ℕ).restrict x by {
+          ext j
+          simp
+        }]
+        rfl
+    · rw [generateFrom_le_iff]
+      intro s hs
+      simp only [mem_setOf_eq]
+      unfold cylinders cylinder_n at hs
+      simp at hs
+      obtain ⟨n, ⟨s', hs'⟩⟩ := hs
+      rw [<- hs'.2]
+      apply MeasurableSet.preimage
+      exact hs'.1
+      exact measurable_restrict {k | k ≤ n}
   }
 
 
-
+/-!
+This is the measure defined by IonescuTulcea
+-/
 def CompMeasureKernelNat
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
@@ -920,10 +771,6 @@ instance CompMeasureKernelNatProbability
   }
 
 
-
-
--- #check Measure.ext_of_generateFrom_of_iUnion
--- #check MeasureTheory.ext_of_generate_finite
 lemma uniqeness_of_prob_measures [mα : MeasurableSpace α] (μ ν : Measure α)
   (hμ : IsProbabilityMeasure μ) (hν : IsProbabilityMeasure ν)
   {S : Set (Set α)}
@@ -944,6 +791,38 @@ lemma uniqeness_of_prob_measures [mα : MeasurableSpace α] (μ ν : Measure α)
     }
   }
 
+lemma cylinders_pisystem (α : ℕ -> Type*) [∀m, MeasurableSpace (α m)]
+  [∀m, Inhabited (α m)]: IsPiSystem (cylinders α) := by {
+    intros s hs t ht hst
+    simp only [cylinders, mem_iUnion] at hs ht
+    obtain ⟨m, hs⟩ := hs
+    obtain ⟨n, ht⟩ := ht
+    wlog hmn : m ≤ n generalizing s t n m
+    {
+      rw [inter_comm]
+      apply this
+      rwa [inter_comm]
+      exact ht
+      exact hs
+      exact Nat.le_of_not_ge hmn
+    }
+    apply cylinder_subset α hmn at hs
+    unfold cylinders
+    simp
+    use n
+    unfold cylinder_n at *
+    simp_all
+    obtain ⟨w, h⟩ := ht
+    obtain ⟨w_1, h_1⟩ := hs
+    obtain ⟨left, right⟩ := h
+    obtain ⟨left_1, right_1⟩ := h_1
+    subst right right_1
+    use w ∩ w_1
+    constructor
+    · exact MeasurableSet.inter left left_1
+    · rw [preimage_inter, inter_comm]
+  }
+
 theorem uniqueness_compMeasureKernelNat
   {α : ℕ -> Type*}
   [∀m, MeasurableSpace (α m)]
@@ -959,29 +838,7 @@ theorem uniqueness_compMeasureKernelNat
     apply uniqeness_of_prob_measures
     exact CompMeasureKernelNatProbability μ K
     exact hν
-    sorry
-    -- exact Eq.symm cylinders_generate
-    -- exact isPiSystem_measurableCylinders
-
-    -- exact cylinders_SetAlgebra α
-    -- exact h
+    exact cylinders_generate α
+    exact cylinders_pisystem α
+    exact h
   }
-
-
-
-
-
-
--- def ProductProbabilityMeasure  {I : Type*} [Fintype I] {Ω : I -> Type*}
--- [∀i, MeasurableSpace (Ω i)] (P : (i : I) -> ProbabilityMeasure (Ω i)) :
---   ProbabilityMeasure (ProductSpace Ω) := sorry
-
-
--- theorem existence_infinite_product_probability_measure :
--- ∀(P : (i : I) -> ProbabilityMeasure (Ω i)),
---   ∃! PP : ProbabilityMeasure (ProductSpace Ω), ∀(J : Finset I),
---    ProbabilityMeasure.map ℙ (aemeasurable (measurable_restrict J))
---     = ProductProbabilityMeasure (J.restrict P) := by {
---       sorry
---   }
---/

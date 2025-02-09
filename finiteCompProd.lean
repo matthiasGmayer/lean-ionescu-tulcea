@@ -6,19 +6,27 @@ import IonescuTulcea.AddContentExtension
 import Mathlib
 
 open IndexedFamilies
--- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 
 set_option autoImplicit true
-/- open namespaces that you use to shorten names and enable notation. -/
 open Function Set Classical ENNReal
 
-/- recommended whenever you define anything new. -/
 noncomputable section
 
+/-!
 
-/- Now write definitions and theorems. -/
+This file contains the definition of a finite composition of kernels and measures
+and some lemmas about them.
+It defines cylinders that are naturally defined on {k<=n} (instead of finset like in mathlib)
+We can then define the sequence of finite compositions (μ ⊗ ... K n), and we show that
+we can Lift up, i.e. we have the consistency property that (π{≤n})#(μ ⊗ ... K m) = (μ ⊗ ... K n) for n <= m
 
-namespace ProductProbabilityMeasure
+In the end there are some definitions to handle interaction between indexed families.
+I.e. compose a b uses a on its indices and b on its indices.
+For convenience i assumed inhabited, which could be relaxed, but Ionescu Tulcea becomes trivially untrue then,
+so i didn't bother.
+-/
+
+namespace CompProdMeasures
 open MeasureTheory MeasurableSpace Measurable ProductLike
 
 -- Ionescu-Tulcea
@@ -625,25 +633,6 @@ lemma Kernel.finiteCompLift
       exact hn₀
       exact hs
     }
-
-    -- wlog hn : m = n
-    -- {
-    --   sorry
-    --   -- specialize this μ K x m hm (Nat.le_add_right m 1)
-    --   -- specialize this μ K x m hm hnm s hs hresm hn₀
-    --   -- clear this
-    --   rw [Kernel.map_apply, Measure.map_apply]
-    --   conv => rhs; tactic => {
-    --     rw [<- hm]
-    --     sorry
-    --     sorry
-    --   }
-
-    --   -- rw [<- hm]
-
-    --   -- specialize this μ K
-    -- }
-    -- subst hn
     generalize_proofs hresn
     have hres : {k' | k < k' ∧ k' <= k+m+1} ⊆ {k' | k < k' ∧ k' <= k+(m+1)+1} := by simp; intros; omega
     rw [show restrict₂ hresm = (restrict₂ hresn) ∘  (restrict₂ hres) by rfl]
@@ -667,30 +656,6 @@ lemma Kernel.finiteCompLift
       try simp; intros; omega
     }
   }
-    -- intro s hs
-    -- generalize_proofs hres
-    -- by_cases h0 : n = m + 1
-    -- · subst h0
-    --   rw [show restrict₂ hres = id by rfl]
-    --   simp
-    -- by_cases h1 : n = m
-    -- · subst h1
-    --   exact heqm s hs
-    -- have h : n <= m := by omega
-    -- have hresn := le_to_subset h
-    -- rw [Measure.map_apply (measurable_restrict₂ hres) hs]
-    -- rw [show restrict₂ hres = restrict₂ hresn ∘ (restrict₂ hresm) from rfl]
-    -- let t := restrict₂ hresn ⁻¹' s
-    -- have ht : MeasurableSet t := MeasurableSet.preimage hs (measurable_restrict₂ _)
-    -- rw [<- comp_preimage]
-    -- rw [show restrict₂ hresn ⁻¹'s = t from rfl]
-    -- rw [<- Measure.map_apply (measurable_restrict₂ hresm) ht]
-    -- specialize heqm t ht
-    -- rw [heqm]
-    -- unfold t
-    -- rw [<- Measure.map_apply (measurable_restrict₂ hresn) hs]
-    -- exact hm h s hs
-    -- }
 }
 lemma Measure.finiteCompLift
   {α : ℕ -> Type*}

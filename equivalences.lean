@@ -2,23 +2,18 @@
 This might make the loading time of a file a bit longer. If you want a good chunk of Mathlib, but not everything, you can `import Mathlib.Tactic` and then add more imports as necessary. -/
 import IonescuTulcea.prodLike
 import IonescuTulcea.inlinesimp
--- import IonescuTulcea.indexedfamilies
 import Mathlib
--- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 
 set_option autoImplicit true
-/- open namespaces that you use to shorten names and enable notation. -/
 open Function Set Classical ENNReal
 
 
-
-
-/- recommended whenever you define anything new. -/
 noncomputable section
 
-
-/- Now write definitions and theorems. -/
-
+/-!
+This file defines canonical equivalences between measurable spaces
+and for productlike structure.
+-/
 namespace IndexedFamilies
 
 open MeasureTheory MeasurableSpace Measurable ProductLike

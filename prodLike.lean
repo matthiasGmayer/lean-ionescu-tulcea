@@ -1,18 +1,16 @@
-/- It is fine to import all of Mathlib in your project.
-This might make the loading time of a file a bit longer. If you want a good chunk of Mathlib, but not everything, you can `import Mathlib.Tactic` and then add more imports as necessary. -/
 import Mathlib
--- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 
 set_option autoImplicit true
-/- open namespaces that you use to shorten names and enable notation. -/
 open Function Set Classical
 open ENNReal
 
-/- recommended whenever you define anything new. -/
 noncomputable section
 
+/-!
+This file defines productlike measurable spaces
+-/
 
-/- Now write definitions and theorems. -/
+
 
 namespace ProductLike
 open MeasureTheory MeasurableSpace Measurable ProbabilityTheory MeasurableEquiv
@@ -123,18 +121,3 @@ lemma compProd'_apply (μ : Measure α) (K : Kernel α β) [p: ProdLikeM γ α �
     exact MeasurableEquiv.measurable ProdLikeM.equiv.symm
     apply MeasurableSet.preimage hs (MeasurableEquiv.measurable p.equiv)
   }
-
--- @[simp]
--- theorem compProd'_is_Kernel_compProd (K : Kernel α β) (L : Kernel (α × β) γ)
--- : compProd' K ⊗ₖ' L = K ⊗ₖ L := by {
---   rw [show K ⊗ₖ' L = change_right (K ⊗ₖ change_left L ProdLikeM.equiv) ProdLikeM.equiv.symm from rfl]
---   unfold change_right change_left
---   generalize_proofs ms1 ms2
---   rw [show L.comap ProdLikeM.equiv.invFun ms1 = L by {
---     exact rfl
---   }]
---   rw [show ⇑ProdLikeM.equiv.symm = id by {
---     rfl
---   }]
---   exact Kernel.map_id (K ⊗ₖ L)
--- }

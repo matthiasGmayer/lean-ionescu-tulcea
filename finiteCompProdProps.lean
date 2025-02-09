@@ -1,25 +1,26 @@
-/- It is fine to import all of Mathlib in your project.
-This might make the loading time of a file a bit longer. If you want a good chunk of Mathlib, but not everything, you can `import Mathlib.Tactic` and then add more imports as necessary. -/
 import IonescuTulcea.prodLike
 import IonescuTulcea.finiteCompProd
--- import IonescuTulcea.indexedfamilies
 import Mathlib
--- import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 
 set_option autoImplicit true
-/- open namespaces that you use to shorten names and enable notation. -/
 open Function Set Classical ENNReal
 
-/- recommended whenever you define anything new. -/
 noncomputable section
 
+/-!
+This file contains some lemmas that are used in the proofs of the main results.
+For example, we prove the associativity of the compProd' operator, so that we can
+use measures and kernels. e.g. (μ ⊗ K₁ ... ⊗ Kn) ⊗ (.... Km) = μ ⊗ (K₁ ⊗ ... ⊗ Km)
+This is done in generality by the lemma assoc_compProd'_kernel_compProd'
+which deduces a prodlike structure from the given prodlikes.
+To get the real associativity then you need to show that this inferred structure is the same
+as the one in the statement of your lemma.
+This is done in the lemma compProd'_measure_kernel_finite_comp
+Furthermore there are a few lemmas that tell us how these products interact with integrals.
+-/
 
-/- Now write definitions and theorems. -/
-
-namespace ProductProbabilityMeasure
+namespace CompProdMeasures
 open MeasureTheory MeasurableSpace Measurable ProductLike
-
--- Ionescu-Tulcea
 open ProbabilityMeasure Measure ProductLike
 
 open ProbabilityTheory
@@ -176,32 +177,6 @@ lemma kernel_slice_integral
     all_goals measurability
 }
 
--- lemma kernel_slice_fun_apply
---   [MeasurableSpace α]
---   [MeasurableSpace β]
---   [MeasurableSpace γ]
---   [MeasurableSpace δ]
---   [p : ProdLikeM δ β γ]
---   (μ : Measure α)
---   (K : Kernel β γ)
---   [IsSFiniteKernel K]
---   [SFinite μ]
---   (A : Set δ)
---   (hA : MeasurableSet A)
---   (f : α -> β)
---   : kernel_slice K A (f ω) = kernel_slice (K.comap f) A ω := by {
-
---   }
--- def test
---   {α β : Type}
---   (f : α -> γ)
---   (g : β -> δ)
---   : α × β -> γ × δ
---   := by {
---     exact fun a ↦ Prod.map f g a
---   }
-  -- λ x => (f x.1, g x.2)
-
 lemma preimage_indicator (f : α -> β) (A : Set β) : ((f ⁻¹' A).indicator 1 x : ℝ≥0∞) = A.indicator 1 (f x)  := by {
   exact rfl
 }
@@ -308,29 +283,6 @@ lemma Kernel.compProd'_measure_kernel_step
     (p := ProdLikeM.insert_m n (m+1))
     = FiniteCompKernelNat K n (m+1) := by rfl
 
--- lemma assoc_Kernel.compProd'
---   [MeasurableSpace α₁]
---   [MeasurableSpace α₂]
---   [MeasurableSpace α₃]
---   [MeasurableSpace β₁]
---   [MeasurableSpace β₂]
---   [MeasurableSpace β₃]
---   [MeasurableSpace γ]
---   (K₁ : Kernel α₁ β₁)
---   -- [p₁ : ProdLikeM α₂ α₁ β₁]
---   (K₂ : Kernel α₂ β₂)
---   -- α₁ × β₁ = α₂
---   -- α₁ × β₁ = α₂
---   (K₃ : Kernel α₃ β₃)
---   [p₁ : ProdLikeM α₂ α₁ β₁]
---   [q₁ : ProdLikeM γ β₁ β₂]
---   [p₂ : ProdLikeM α₃ α₂ β₂]
---   [q₂ : ProdLikeM γ β₂ β₃]
---   -- [q₁ : ProdLikeM α₃ α₂ β₂]
---   : Kernel.compProd' (Kernel.compProd' K₁ K₂) K₃
---     = Kernel.compProd' K₁ (Kernel.compProd' K₂ K₃) := by {
---   }
-
 def Equiv.switch_equiv {α β γ : Type*} : α × β × γ ≃ (α × β) × γ where
   toFun := λ ⟨a,b,c⟩ => ((a,b),c)
   invFun := λ ⟨⟨a,b⟩,c⟩ => (a,b,c)
@@ -397,19 +349,6 @@ def switch_ProdLikeM
           MeasurableEquiv.trans τ₁ <|
           MeasurableEquiv.trans τ₂ τ₃
   }⟩
-
--- instance
---   ProdlikeM.switch
---   [MeasurableSpace α]
---   [MeasurableSpace β]
---   [MeasurableSpace γ]
---   [p : ProdLikeM γ α β] -- γ = α × β
---   [MeasurableSpace δ]
---   [MeasurableSpace ε]
---   [q : ProdLikeM ε β δ] -- ε = β × δ
---   [MeasurableSpace E]
---   [r : ProdLikeM E α ε] -- ε = β × δ
---   : ProdLikeM E γ δ := switch_ProdLikeM (p := p) (q := q) (r:=r)
 
 @[simp]
 lemma switch_ProdLikeM_fun
@@ -741,11 +680,6 @@ lemma equivtofun
 @[simp]
 lemma equivtofun'
   : { toFun := f, invFun := f', left_inv := h, right_inv := g : Equiv α β} x = f x := by rfl
--- @[simp]
--- lemma mequivtofun
---   [MeasurableSpace α]
---   [MeasurableSpace β]
---   : { toFun := f, invFun := f', left_inv := h, right_inv := g, measurable_invFun := h', measurable_toFun := g' : MeasurableEquiv α β}.1 = f := by rfl
 @[simp]
 lemma mequivtofun'
   [MeasurableSpace α]
@@ -860,35 +794,6 @@ lemma compProd'_measure_kernel_finite_comp
       }
     }
 
--- lemma kernel_apply
---   {α : ℕ -> Type*}
---   [∀n, MeasurableSpace (α n)]
---   [∀n, Inhabited (α n)]
---   (K : ∀n, Kernel (⇑α {k|k ≤ n}) (α (n+1)))
---   [∀n, IsMarkovKernel (K n)]
---   (A : ∀n, Set (⇑α {k|k ≤ n}))
---   (hA : MeasurableSet (A n))
---   (n m : ℕ)
---   (ω : ⇑α {k | k ≤ n})
--- ((K n) ω ⊗ₘ (FiniteCompKernelNat K (n + 1) m).comap (compapp ω) ())
--- = FiniteCompKernelNat K n (m)
--- lemma kernel_slice_compProd
---   {α : ℕ -> Type*}
---   [∀n, MeasurableSpace (α n)]
---   [∀n, Inhabited (α n)]
---   (K : ∀n, Kernel (⇑α {k|k ≤ n}) (α (n+1)))
---   [∀n, IsSFiniteKernel (K n)]
---   (A : ∀n, Set (⇑α {k|k ≤ n}))
---   (hA : MeasurableSet (A n))
---   (n m : ℕ)
---   (ω : ⇑α {k | k ≤ n})
---   : kernel_slice (FiniteCompKernelNat K n m) (A (n + m + 1)) ω
---     = (compProd' (K n ω) (FiniteCompKernelNat K (n + 1) m) : Measure (⇑α {K | K ≤ n + m + 1}))
---       {ω' : ⇑α {k | n < k ∧ k <= n+m+1}| (compose' ω ω' : ⇑α {k | k <= n+m+1}) ∈ (A (n+m+1))} := by {
-
---     }
-    -- = FiniteCompMeasureKernelNat (K n ω) := sorry
-
 @[simp]
 lemma compapp_null_action
   {α : I -> Type*}
@@ -952,8 +857,6 @@ lemma kernel_slice_integral''
   [∀n, Inhabited (α n)]
   (K : ∀n, Kernel (⇑α {k|k ≤ n}) (α (n+1)))
   [∀n, IsMarkovKernel (K n)]
-  -- (A : ∀n, Set (⇑α {k|k ≤ n}))
-  -- (hA : MeasurableSet (A n))
   (n m : ℕ)
   (ω : ⇑α {k | k ≤ n})
   (f : ⇑α {k | k <= n + (m+1) + 1} -> ℝ≥0∞)
