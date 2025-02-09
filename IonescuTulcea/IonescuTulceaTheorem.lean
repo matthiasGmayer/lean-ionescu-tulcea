@@ -1,5 +1,4 @@
 import Mathlib
-import IonescuTulcea
 import IonescuTulcea.strong_rec
 import IonescuTulcea.finiteCompProd
 import IonescuTulcea.finiteCompProdProps
